@@ -13,7 +13,19 @@
     background: radial-gradient(ellipse at top, #2a1b4f 0%, #120e24 60%, #08060f 100%);
     color: #eee8ff; overflow: hidden; user-select: none;
   }
-  #app { display: flex; flex-direction: column; height: var(--tg-viewport-stable-height, 100vh); }
+  #app { display: flex; flex-direction: column; height: var(--tg-viewport-stable-height, 100vh); position: relative; z-index: 1; }
+  body { transition: background .6s; }
+  #bgfx { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  #bgfx span { position: absolute; display: block; }
+  @keyframes fxFall { from { transform: translateY(-10vh) rotate(0deg); } to { transform: translateY(110vh) rotate(360deg); } }
+  @keyframes fxRise { from { transform: translateY(110vh); opacity: 0; } 10% { opacity: 1; } to { transform: translateY(-10vh); opacity: 0; } }
+  @keyframes fxTwinkle { 0%,100% { opacity: .15; } 50% { opacity: 1; } }
+  @keyframes fxAurora { 0% { transform: translateX(-20%) skewX(-10deg); } 100% { transform: translateX(20%) skewX(10deg); } }
+  .bg-row { display: flex; align-items: center; gap: 10px; padding: 8px; margin-bottom: 8px; border-radius: 14px; background: rgba(255,255,255,.05); text-align: left; }
+  .bg-row.on { outline: 2px solid #ffd75e; }
+  .bg-sw { width: 54px; height: 54px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+  .bg-row .info { flex: 1; min-width: 0; } .bg-row .info b { display: block; font-size: 14px; } .bg-row small { color: #a99cc9; font-size: 11px; }
+  .bg-row .btn { min-width: 0; padding: 8px 10px; font-size: 12px; }
   header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px;
     background: rgba(0,0,0,.25); border-bottom: 1px solid rgba(180,107,255,.2); }
   .coins { font-size: 22px; font-weight: 800; color: #ffd75e; }
@@ -161,6 +173,7 @@
 </style>
 </head>
 <body>
+<div id="bgfx"></div>
 <div id="app">
   <header>
     <div class="coins">🪙 <span id="coins">0</span><small id="hello">Шахтёр</small></div>
@@ -184,6 +197,7 @@
         <div class="stat"><b id="tapStat">0</b><span class="muted">за тап</span></div>
         <div class="stat"><b id="collStat">0</b><span class="muted">коллекция</span></div>
       </div>
+      <button class="btn wide ghost" onclick="openBgs()" style="margin-bottom:12px">🎨 Фоны шахты · <span id="bgName"></span></button>
       <div class="boosts" id="boosts"></div>
       <h2>Шансы добычи</h2>
       <div id="chances"></div>
@@ -520,6 +534,7 @@ function adminUnlock() {
   S.found = S.found.map(() => 1);
   S.items = S.items.map(v => Math.max(v, 1));
   S.drills = S.drills.map(l => Math.max(l, 0));
+  S.bgs = BGS.map(b => b.id);
   S.pets = S.pets.map((l, i) => PETS[i].removed ? l : Math.max(l, 1));
   invDirty = true; build(); renderDrillAnim(); save(true); update();
   document.getElementById('modal').classList.remove('show');
@@ -531,7 +546,7 @@ function adminCoins() {
 }
 function adminReset() {
   const keepT = Date.now();
-  S = defaults(); S.t = keepT;
+  S = defaults(); S.t = keepT; applyBg();
   invDirty = true; build(); renderDrillAnim(); renderAstral(); save(true); update();
   document.getElementById('modal').classList.remove('show');
   showToast('♻️ Прогресс сброшен');
@@ -551,7 +566,7 @@ function defaults() {
   return {
     coins: 0, items: Array(ASTRALS.length).fill(0), found: Array(ASTRALS.length).fill(0),
     drills: DRILLS.map((_, i) => i === 0 ? 0 : -1), pets: PETS.map(() => 0),
-    dv: 2, rebirths: 0, luck: 0, tap: 0, astral: 0, progress: 0, total: 0, earned: 0, t: Date.now()
+    dv: 2, rebirths: 0, luck: 0, tap: 0, afkEff: 0, afkTime: 0, astral: 0, bg: 'space', bgs: ['space'], progress: 0, total: 0, earned: 0, t: Date.now()
   };
 }
 let S = defaults();
@@ -567,7 +582,7 @@ const pct = v => v >= 0.1 ? (v * 100).toFixed(1) + '%' : v >= 0.001 ? (v * 100).
 const petBoost = kind => 1 + PETS.reduce((s, p, i) => s + (p.removed ? 0 : S.pets[i] * (p.b[kind] || 0)), 0) / 100;
 const speedMul = () => petBoost('speed') + secretBonus('speed') + S.rebirths * REB_SPEED;
 const moneyMul = () => petBoost('money') + secretBonus('money');
-const luckMul  = () => petBoost('luck') + S.luck * 0.05 + S.astral * ASTRAL_LUCK + S.rebirths * REB_LUCK;
+const luckMul  = () => petBoost('luck') + S.luck * 0.05 + S.astral * ASTRAL_LUCK + S.rebirths * REB_LUCK + bgLuck();
 const vipMul   = () => petBoost('vip');
 const tapMul   = () => petBoost('tap');
 
@@ -725,6 +740,14 @@ function drillAction(i) {
   renderDrillAnim(); save();
 }
 function buyLuck() { const b = bulk(luckCostAt, S.luck, 1000); if (!b.n || S.coins < b.cost) return; S.coins -= b.cost; S.luck = b.to; haptic(); save(); }
+// ===== АФК-добыча: эффективность (50% → 100%) и время (8ч → 24ч), плюс авто-продажа
+const AFK_EFF_MAX = 10, AFK_TIME_MAX = 8;
+const afkEff = (l = S.afkEff) => 0.5 + 0.05 * l;
+const afkHours = (l = S.afkTime) => 8 + 2 * l;
+const afkEffCostAt = l => Math.ceil(50000 * Math.pow(3, l));
+const afkTimeCostAt = l => Math.ceil(100000 * Math.pow(3, l));
+function buyAfkEff()  { const b = bulk(afkEffCostAt,  S.afkEff,  AFK_EFF_MAX);  if (!b.n || S.coins < b.cost) return; S.coins -= b.cost; S.afkEff = b.to;  haptic(); save(); update(); }
+function buyAfkTime() { const b = bulk(afkTimeCostAt, S.afkTime, AFK_TIME_MAX); if (!b.n || S.coins < b.cost) return; S.coins -= b.cost; S.afkTime = b.to; haptic(); save(); update(); }
 function buyTap()  { const b = bulk(tapCostAt, S.tap, 1000);   if (!b.n || S.coins < b.cost) return; S.coins -= b.cost; S.tap = b.to;  haptic(); save(); }
 function buyPet(i) {
   if (!S.pets[i]) return; // новых питомцев можно получить только из кейса (или найти в шахте)
@@ -754,6 +777,58 @@ function openItem(i) {
     <p class="muted" style="margin-top:8px">У тебя: <b style="color:#fff">${fmt(S.items[i])}</b> · Цена: 🪙 ${fmt(sellPrice(i))}</p>
     <div class="row"><button class="btn ghost" ${S.items[i] ? '' : 'disabled'} onclick="sell(${i}, false)">Продать 1</button>
     <button class="btn ${a.t >= 3 ? 'pink' : ''}" ${S.items[i] ? '' : 'disabled'} onclick="sell(${i}, true)">Продать все</button></div>`, 'Закрыть');
+}
+
+// ================= Фоны =================
+// luck — бонус к удаче, пока фон надет. cost — купить, fromCase — выпадает из кейса (номер), reb — за N перерождений
+const BGS = [
+  { id: 'space',  name: 'Космос',          icon: '🌌', luck: 0,    bg: 'radial-gradient(ellipse at top, #2a1b4f 0%, #120e24 60%, #08060f 100%)', fx: 'stars' },
+  { id: 'cave',   name: 'Пещера',          icon: '⛏️', luck: 0.02, cost: 1e5, bg: 'radial-gradient(ellipse at top, #4a3a2a 0%, #1f1810 60%, #0a0805 100%)', fx: 'dust' },
+  { id: 'lava',   name: 'Лава',            icon: '🔥', luck: 0.03, cost: 5e6, bg: 'radial-gradient(ellipse at bottom, #7a1a05 0%, #2a0a05 55%, #0a0303 100%)', fx: 'embers' },
+  { id: 'ice',    name: 'Ледяная шахта',   icon: '❄️', luck: 0.04, cost: 5e7, bg: 'radial-gradient(ellipse at top, #1f4a6b 0%, #0d2235 60%, #050d15 100%)', fx: 'snow' },
+  { id: 'ocean',  name: 'Подводный мир',   icon: '🌊', luck: 0.05, fromCase: 1, bg: 'linear-gradient(180deg, #0a5a7a 0%, #06304a 55%, #021520 100%)', fx: 'bubbles' },
+  { id: 'aurora', name: 'Северное сияние', icon: '🌈', luck: 0.07, fromCase: 2, bg: 'linear-gradient(180deg, #08122a 0%, #0a1f2a 50%, #05080f 100%)', fx: 'aurora' },
+  { id: 'march',  name: 'Мартовский',      icon: '💝', luck: 0.10, reb: 3, bg: 'radial-gradient(ellipse at top, #6b1a4a 0%, #2a0a25 60%, #0f040d 100%)', fx: 'hearts' },
+];
+const BG_CASE_CHANCE = 0.03; // шанс фона из кейса
+const curBg = () => BGS.find(b => b.id === S.bg) || BGS[0];
+const bgLuck = () => (S.bgs || []).includes(S.bg) ? curBg().luck : 0;
+function applyBg() {
+  const b = curBg();
+  document.body.style.background = b.bg;
+  const fx = document.getElementById('bgfx'); let h = '';
+  const R = (a, z) => a + Math.random() * (z - a);
+  if (b.fx === 'stars') for (let k = 0; k < 40; k++) h += `<span style="left:${R(0,100)}%;top:${R(0,100)}%;width:${R(1,3)}px;height:${R(1,3)}px;border-radius:50%;background:#fff;animation:fxTwinkle ${R(2,5)}s ${R(0,5)}s infinite"></span>`;
+  if (b.fx === 'dust') for (let k = 0; k < 25; k++) h += `<span style="left:${R(0,100)}%;width:${R(2,4)}px;height:${R(2,4)}px;border-radius:50%;background:#c9a57a;opacity:.5;animation:fxFall ${R(10,20)}s ${-R(0,20)}s linear infinite"></span>`;
+  if (b.fx === 'embers') for (let k = 0; k < 30; k++) h += `<span style="left:${R(0,100)}%;width:${R(3,6)}px;height:${R(3,6)}px;border-radius:50%;background:#ff8a1f;box-shadow:0 0 8px #ff4a00;animation:fxRise ${R(5,10)}s ${-R(0,10)}s linear infinite"></span>`;
+  if (b.fx === 'snow') for (let k = 0; k < 35; k++) h += `<span style="left:${R(0,100)}%;font-size:${R(8,16)}px;color:#e0f4ff;opacity:.8;animation:fxFall ${R(8,16)}s ${-R(0,16)}s linear infinite">❄</span>`;
+  if (b.fx === 'bubbles') for (let k = 0; k < 25; k++) { const z = R(6,16); h += `<span style="left:${R(0,100)}%;width:${z}px;height:${z}px;border-radius:50%;border:1.5px solid rgba(180,240,255,.6);animation:fxRise ${R(6,12)}s ${-R(0,12)}s linear infinite"></span>`; }
+  if (b.fx === 'aurora') { for (let k = 0; k < 3; k++) h += `<span style="left:-30%;right:-30%;top:${5 + k * 12}%;height:28%;filter:blur(30px);opacity:.55;background:linear-gradient(90deg,transparent,${['#2effa0','#4dd2ff','#b46bff'][k]},transparent);animation:fxAurora ${6 + k * 2}s ease-in-out infinite alternate"></span>`;
+    for (let k = 0; k < 25; k++) h += `<span style="left:${R(0,100)}%;top:${R(40,100)}%;width:2px;height:2px;border-radius:50%;background:#fff;animation:fxTwinkle ${R(2,5)}s ${R(0,5)}s infinite"></span>`; }
+  if (b.fx === 'hearts') for (let k = 0; k < 22; k++) h += `<span style="left:${R(0,100)}%;font-size:${R(10,20)}px;opacity:.7;animation:fxFall ${R(9,16)}s ${-R(0,16)}s linear infinite">${Math.random() < .5 ? '💗' : '💖'}</span>`;
+  fx.innerHTML = h;
+  const n = document.getElementById('bgName'); if (n) n.textContent = b.icon + ' ' + b.name;
+}
+function bgOwned(b) {
+  if (!S.bgs) S.bgs = ['space'];
+  if (b.reb && S.rebirths >= b.reb && !S.bgs.includes(b.id)) S.bgs.push(b.id);
+  return S.bgs.includes(b.id);
+}
+function openBgs() {
+  showModal(`<h3>🎨 Фоны шахты</h3><p class="muted" style="margin:4px 0 10px;font-size:12px">Надетый фон даёт бонус к удаче</p>
+    <div class="list">${BGS.map(b => {
+      const own = bgOwned(b), on = S.bg === b.id;
+      const how = b.cost ? `🪙 ${fmt(b.cost)}` : b.fromCase ? `Из кейса «${CASES[b.fromCase].name}»` : b.reb ? `За ${b.reb} перерождения` : '';
+      const btn = on ? `<button class="btn" disabled>Надет</button>` : own ? `<button class="btn" onclick="setBg('${b.id}')">Надеть</button>`
+        : b.cost ? `<button class="btn" onclick="buyBg('${b.id}')" ${S.coins < b.cost ? 'disabled' : ''}>${how}</button>` : `<button class="btn ghost" disabled>🔒</button>`;
+      return `<div class="bg-row ${on ? 'on' : ''}"><div class="bg-sw" style="background:${b.bg}">${b.icon}</div>
+        <div class="info"><b>${b.name}</b><small>${b.luck ? `+${Math.round(b.luck * 100)}% удача` : 'Без бонуса'}${own ? '' : ' · ' + how}</small></div>${btn}</div>`;
+    }).join('')}</div>`, 'Закрыть');
+}
+function setBg(id) { S.bg = id; applyBg(); save(true); update(); openBgs(); haptic('medium'); }
+function buyBg(id) {
+  const b = BGS.find(x => x.id === id); if (!b || !b.cost || S.coins < b.cost || bgOwned(b)) return;
+  S.coins -= b.cost; S.bgs.push(id); setBg(id); showToast(`${b.icon} Фон «${b.name}» открыт!`);
 }
 
 // ================= Кейсы =================
@@ -809,7 +884,9 @@ function openCase(ci) {
   let tick = setInterval(() => haptic('soft'), 180);
   setTimeout(() => {
     clearInterval(tick); rolling = false;
-    const msg = applyItem(win);
+    let msg = applyItem(win);
+    const cb = BGS.find(b => b.fromCase === ci);
+    if (cb && !bgOwned(cb) && Math.random() < BG_CASE_CHANCE) { S.bgs.push(cb.id); msg += `<br><b style="color:#ffd75e">🎨 Бонус: фон «${cb.name}»!</b>`; hapticOk(); }
     if (win.t === 'drill') renderDrillAnim();
     save(true); build(); update();
     if (win.r === 'march' || win.r === 'secret' || win.r === 'legend') hapticOk(); else haptic('heavy');
@@ -844,6 +921,7 @@ function doRebirth() {
   S.items = S.items.map(() => 0);
   REG_DRILLS.forEach(i => { S.drills[i] = i === 0 ? 0 : -1; });
   REBORN_DRILLS.forEach(i => { if (DRILLS[i].reborn <= S.rebirths && S.drills[i] < 0) S.drills[i] = 0; });
+  BGS.forEach(bgOwned);
   invDirty = true; build(); renderDrillAnim(); renderAstral(true); save(true); update();
   document.getElementById('modal').classList.remove('show');
   hapticOk();
@@ -929,7 +1007,11 @@ function build() {
       <button class="btn" id="db-${i}" disabled>???</button></div>`; }).join('');
   $('upgradeList').innerHTML = `
     <div class="card"><div class="ico">💪</div><div class="info"><b>Сила удара <span id="ulT"></span></b><small id="uiT"></small></div>
-      <button class="btn" id="ubT" onclick="buyTap()"></button></div>`;
+      <button class="btn" id="ubT" onclick="buyTap()"></button></div>
+    <div class="card"><div class="ico">😴</div><div class="info"><b>АФК-добыча <span id="ulE"></span></b><small id="uiE"></small></div>
+      <button class="btn" id="ubE" onclick="buyAfkEff()"></button></div>
+    <div class="card"><div class="ico">⏰</div><div class="info"><b>АФК-время <span id="ulH"></span></b><small id="uiH"></small></div>
+      <button class="btn" id="ubH" onclick="buyAfkTime()"></button></div>`;
   $('petList').innerHTML = PET_ORDER.map(i => { const p = PETS[i];
     const secret = p.hidden && !S.pets[i];
     if (secret) return `<div class="card pet-secret" id="pc-${i}"><div class="ico pet-ico">❓<i id="pl-${i}"></i></div>
@@ -943,7 +1025,7 @@ function build() {
     const tot = Object.values(c.w).reduce((a, b) => a + b, 0);
     return `<div class="case-card" style="--cc:${c.color}"><div class="case-top"><div class="case-box">${c.icon}</div>
       <div class="info"><b style="font-size:17px">${c.name}</b><small id="cs-${ci}"></small></div></div>
-      <div class="case-odds">${Object.entries(c.w).map(([r, w]) => `<span style="color:${RAR_COLOR[r]}">${RAR_NAME[r]} ${(+(w / tot * 100).toFixed(2)).toString()}%</span>`).join('')}</div>
+      <div class="case-odds">${Object.entries(c.w).map(([r, w]) => `<span style="color:${RAR_COLOR[r]}">${RAR_NAME[r]} ${(+(w / tot * 100).toFixed(2)).toString()}%</span>`).join('')}${BGS.filter(b => b.fromCase === ci).map(b => `<span style="color:#fff">+ фон ${b.icon} ${b.name} ${BG_CASE_CHANCE * 100}%</span>`).join('')}</div>
       <div class="case-btns"><button class="btn" id="cb-${ci}" onclick="openCase(${ci})">Открыть · 🪙 ${fmt(c.cost)}</button></div></div>`;
   }).join('');
   $('rbDrills').innerHTML = REBORN_DRILLS.map(i => { const d = DRILLS[i]; return `
@@ -988,6 +1070,7 @@ function update() {
     if (moneyMul() > 1) chips.push(`💰 монеты ×${moneyMul().toFixed(2)}`);
     if (luckMul() > 1) chips.push(`🍀 удача ×${luckMul().toFixed(2)}`);
     if (tapMul() > 1) chips.push(`👊 тап ×${tapMul().toFixed(2)}`);
+    if (bgLuck() > 0) chips.push(`${curBg().icon} фон +${Math.round(bgLuck() * 100)}% удача`);
     if (vipMul() > 1) chips.push(`💎 VIP/Ультра ×${vipMul().toFixed(2)}`);
     $('boosts').innerHTML = chips.map(c => `<span class="boost-chip">${c}</span>`).join('');
   }
@@ -1022,6 +1105,13 @@ function update() {
     $('ulT').innerHTML = `· ур. ${S.tap} <span class="arrow">→ ${bT.to}</span>`;
     $('uiT').innerHTML = `${fmtD(tapPower() / STEP)} <span class="arrow">→ ${fmtD(tapAt(bT.to))}</span> астр. за тап`;
     $('ubT').textContent = btnText(bT); $('ubT').disabled = S.coins < bT.cost;
+    const bE = bulk(afkEffCostAt, S.afkEff, AFK_EFF_MAX), bH = bulk(afkTimeCostAt, S.afkTime, AFK_TIME_MAX);
+    $('ulE').innerHTML = `· ур. ${S.afkEff}/${AFK_EFF_MAX}`;
+    $('uiE').innerHTML = S.afkEff >= AFK_EFF_MAX ? `Без тебя буры копают на ${Math.round(afkEff() * 100)}% (макс)` : `Без тебя буры копают на ${Math.round(afkEff() * 100)}% <span class="arrow">→ ${Math.round(afkEff(bE.to) * 100)}%</span>`;
+    if (S.afkEff >= AFK_EFF_MAX) { $('ubE').textContent = 'МАКС'; $('ubE').disabled = true; } else { $('ubE').textContent = btnText(bE); $('ubE').disabled = S.coins < bE.cost; }
+    $('ulH').innerHTML = `· ур. ${S.afkTime}/${AFK_TIME_MAX}`;
+    $('uiH').innerHTML = S.afkTime >= AFK_TIME_MAX ? `Копают до ${afkHours()} ч без тебя (макс)` : `Копают до ${afkHours()} ч <span class="arrow">→ ${afkHours(bH.to)} ч</span> без тебя`;
+    if (S.afkTime >= AFK_TIME_MAX) { $('ubH').textContent = 'МАКС'; $('ubH').disabled = true; } else { $('ubH').textContent = btnText(bH); $('ubH').disabled = S.coins < bH.cost; }
   }
   if (tab === 'pets') {
     PETS.forEach((p, i) => {
@@ -1197,19 +1287,24 @@ async function init() {
     document.querySelector('header').insertBefore(b, $('vipBadge'));
   }
   await new Promise(r => checkImages(r));
+  applyBg();
   build();
 
-  // Добыча, пока игрок был оффлайн (50%, максимум 8 часов)
-  const dt = Math.min(8 * 3600, (Date.now() - S.t) / 1000);
+  // Добыча, пока игрок был оффлайн (прокачивается: эффективность и время)
+  const away = (Date.now() - S.t) / 1000;
+  const dt = Math.min(afkHours() * 3600, away);
   if (best && dt > 60) {
-    const n = Math.floor(totalPower() * dt * 0.5 / STEP);
+    const n = Math.floor(totalPower() * dt * afkEff() / STEP);
     if (n > 0) {
       const got = mine(n);
       const rows = Object.keys(got).sort((a, b) => ASTRALS[b].t - ASTRALS[a].t)
         .map(i => `<div class="chance-row">${crystal(+i, 26)}<span>${ASTRALS[i].n}</span><span>+${fmt(got[i])}</span></div>`).join('');
-      showModal(`<h3>⛏️ Пока тебя не было</h3><p class="muted">Буры работали ${Math.floor(dt / 60)} мин. и добыли:</p><div class="list">${rows}</div>`);
+      const hm = s => s >= 3600 ? `${Math.floor(s / 3600)} ч ${Math.floor(s % 3600 / 60)} мин` : `${Math.floor(s / 60)} мин`;
+      showModal(`<h3>⛏️ Пока тебя не было</h3><p class="muted">Буры работали ${hm(dt)} на ${Math.round(afkEff() * 100)}% и добыли:</p>
+        ${away > dt ? `<p style="font-size:12px;color:#ff8a8a;margin-top:4px">Тебя не было ${hm(away)}, но буры копают максимум ${afkHours()} ч. Прокачай «АФК-время» во вкладке Буры!</p>` : ''}
+        <div class="list">${rows}</div>`);
     }
-    tryFinds(dt * 0.5); // если нашлось что-то секретное — его окно покажется поверх
+    tryFinds(dt * afkEff()); // если нашлось что-то секретное — его окно покажется поверх
   }
   update();
   setInterval(() => addProgress(totalPower() * 0.1), 100);
