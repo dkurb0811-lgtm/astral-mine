@@ -81,6 +81,20 @@
   .pet-ico i { position: absolute; bottom: -6px; right: -4px; font-style: normal; font-size: 10px; font-weight: 800;
     background: linear-gradient(135deg,#ffe27a,#c98a10); color: #3a2400; border-radius: 10px; padding: 1px 5px; }
   .card .info { flex: 1; min-width: 0; }
+  .case-card { padding: 14px; margin-bottom: 12px; border-radius: 18px; border: 1.5px solid var(--cc); background: linear-gradient(135deg, color-mix(in srgb, var(--cc) 22%, transparent), rgba(255,255,255,.03)); }
+  .case-top { display: flex; align-items: center; gap: 12px; }
+  .case-top b { display: block; } .case-top small { color: #a99cc9; font-size: 12px; }
+  .case-box { font-size: 44px; filter: drop-shadow(0 0 12px var(--cc)); }
+  .case-odds { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .case-odds span { font-size: 11px; padding: 3px 8px; border-radius: 8px; background: rgba(0,0,0,.25); }
+  .case-btns { display: flex; gap: 8px; }
+  .case-btns .btn { flex: 1; }
+  .roll-win { position: relative; overflow: hidden; height: 96px; border-radius: 14px; background: rgba(0,0,0,.35); margin: 10px 0; }
+  .roll-strip { display: flex; gap: 6px; position: absolute; left: 0; top: 8px; will-change: transform; }
+  .roll-item { width: 80px; height: 80px; flex-shrink: 0; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 36px;
+    background: rgba(255,255,255,.06); border-bottom: 4px solid var(--rc); overflow: hidden; }
+  .roll-item img { width: 70px; height: 70px; object-fit: cover; border-radius: 50%; }
+  .roll-marker { position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; background: #ffd75e; box-shadow: 0 0 10px #ffd75e; z-index: 2; }
   .reb-head { border-color: rgba(255,79,163,.5); background: linear-gradient(135deg, rgba(255,79,163,.18), rgba(123,92,255,.12)); }
   .req-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 6px; border-radius: 12px; background: rgba(255,255,255,.05); font-size: 14px; }
   .req-row span:last-child { font-weight: 700; }
@@ -129,7 +143,7 @@
   .tier-title { display: flex; justify-content: space-between; font-weight: 700; margin: 6px 0 8px; font-size: 14px; }
 
   nav { display: flex; background: rgba(0,0,0,.4); border-top: 1px solid rgba(180,107,255,.2); padding-bottom: env(safe-area-inset-bottom); }
-  nav button { flex: 1; background: none; border: 0; color: #8d82ad; padding: 9px 0 11px; font-size: 10px; cursor: pointer; }
+  nav button { flex: 1; background: none; border: 0; color: #8d82ad; padding: 9px 0 11px; font-size: 9.5px; cursor: pointer; min-width: 0; overflow: hidden; }
   nav button div { font-size: 21px; margin-bottom: 2px; }
   nav button.active { color: #e2c2ff; }
 
@@ -186,7 +200,7 @@
 
     <section id="tab-pets">
       <h2>Питомцы</h2>
-      <p class="muted" style="margin-bottom:12px">Питомцы дают бусты: копают быстрее, приносят больше монет или повышают удачу. Каждый уровень усиливает буст.</p>
+      <p class="muted" style="margin-bottom:12px">Питомцев можно выбить во вкладке 🎁 Кейсы, а мартовских — ещё и найти в шахте. Полученных питомцев можно прокачивать за монеты.</p>
 <div class="buybar"><button data-buy="1" class="on">x1</button><button data-buy="10">x10</button><button data-buy="max">MAX</button></div>
       <div id="petList"></div>
     </section>
@@ -196,6 +210,12 @@
       <p class="muted" style="margin-bottom:12px">Место считается по всем монетам, заработанным за игру</p>
       <div class="card" id="myRank"></div>
       <div id="topList"><p class="muted">Загрузка…</p></div>
+    </section>
+
+    <section id="tab-cases">
+      <h2>🎁 Кейсы</h2>
+      <p class="muted" style="margin-bottom:12px">Питомцы выпадают только из кейсов. Если питомец уже есть — он получает +1 уровень.</p>
+      <div id="caseList"></div>
     </section>
 
     <section id="tab-reb">
@@ -221,6 +241,7 @@
     <button data-tab="drills"><div>🔩</div>Буры</button>
     <button data-tab="pets"><div>🐾</div>Питомцы</button>
     <button data-tab="inv"><div>💎</div>Коллекция</button>
+    <button data-tab="cases"><div>🎁</div>Кейсы</button>
     <button data-tab="reb"><div>🔄</div>Ребёрс</button>
     <button data-tab="top"><div>🏆</div>Топ</button>
   </nav>
@@ -706,7 +727,7 @@ function drillAction(i) {
 function buyLuck() { const b = bulk(luckCostAt, S.luck, 1000); if (!b.n || S.coins < b.cost) return; S.coins -= b.cost; S.luck = b.to; haptic(); save(); }
 function buyTap()  { const b = bulk(tapCostAt, S.tap, 1000);   if (!b.n || S.coins < b.cost) return; S.coins -= b.cost; S.tap = b.to;  haptic(); save(); }
 function buyPet(i) {
-  if (PETS[i].hidden && !S.pets[i]) return;
+  if (!S.pets[i]) return; // новых питомцев можно получить только из кейса (или найти в шахте)
   const was = S.pets[i];
   const b = bulk(l => petCostAt(i, l), was, PET_MAX);
   if (!b.n || S.coins < b.cost) return;
@@ -733,6 +754,69 @@ function openItem(i) {
     <p class="muted" style="margin-top:8px">У тебя: <b style="color:#fff">${fmt(S.items[i])}</b> · Цена: 🪙 ${fmt(sellPrice(i))}</p>
     <div class="row"><button class="btn ghost" ${S.items[i] ? '' : 'disabled'} onclick="sell(${i}, false)">Продать 1</button>
     <button class="btn ${a.t >= 3 ? 'pink' : ''}" ${S.items[i] ? '' : 'disabled'} onclick="sell(${i}, true)">Продать все</button></div>`, 'Закрыть');
+}
+
+// ================= Кейсы =================
+const RAR_COLOR = { rare: '#4da3ff', epic: '#b46bff', myth: '#ff5a5a', legend: '#ffd75e', march: '#ff4fa3', secret: '#3affd0' };
+const RAR_NAME = { rare: 'Редкий', epic: 'Эпический', myth: 'Мифический', legend: 'Легендарный', march: 'Мартовский', secret: 'Секретный бур' };
+const CASES = [
+  { name: 'Обычный кейс',    icon: '📦', cost: 5e4, color: '#4da3ff', w: { rare: 70, epic: 25, myth: 5 } },
+  { name: 'Эпический кейс',  icon: '🎁', cost: 5e6, color: '#b46bff', w: { epic: 55, myth: 30, legend: 14, march: 1 } },
+  { name: 'Мартовский кейс', icon: '💝', cost: 5e8, color: '#ff4fa3', w: { myth: 40, legend: 45, march: 10, secret: 5 } },
+];
+const caseItems = r => r === 'secret' ? SECRET_DRILLS.map(i => ({ t: 'drill', i, r })) : PETS.map((p, i) => ({ p, i })).filter(x => x.p.rare === r && !x.p.removed).map(x => ({ t: 'pet', i: x.i, r }));
+function rollCase(c) {
+  const tot = Object.values(c.w).reduce((a, b) => a + b, 0);
+  let x = Math.random() * tot, r = 'rare';
+  for (const k in c.w) { x -= c.w[k]; if (x < 0) { r = k; break; } }
+  const pool = caseItems(r);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+const itemIcon = it => it.t === 'drill' ? drillSvg(DRILLS[it.i].color, 60) : petIcon(it.i);
+const itemName = it => it.t === 'drill' ? DRILLS[it.i].name : PETS[it.i].name;
+function applyItem(it) {
+  if (it.t === 'drill') {
+    const was = S.drills[it.i];
+    if (was < 0) { S.drills[it.i] = 0; return 'Новый секретный бур!'; }
+    if (was < MAX_LVL) { S.drills[it.i]++; return `Уровень бура: ${was + 1} → ${was + 2}`; }
+  } else {
+    const was = S.pets[it.i];
+    if (was === 0) { S.pets[it.i] = 1; return 'Новый питомец!'; }
+    if (was < PET_MAX) { S.pets[it.i]++; return `Уровень: ${was} → ${was + 1}`; }
+  }
+  const back = Math.floor(CASES[lastCase].cost * 0.5); S.coins += back;
+  return `Уже максимум — возвращено 🪙 ${fmt(back)}`;
+}
+let lastCase = 0, rolling = false;
+function openCase(ci) {
+  const c = CASES[ci];
+  if (rolling || S.coins < c.cost) return;
+  S.coins -= c.cost; lastCase = ci; rolling = true; haptic('medium');
+  const win = rollCase(c);
+  const N = 40, WIN = 34, items = [];
+  for (let k = 0; k < N; k++) items.push(k === WIN ? win : rollCase(c));
+  showModal(`<h3>${c.icon} ${c.name}</h3>
+    <div class="roll-win"><div class="roll-marker"></div><div class="roll-strip" id="rollStrip">
+    ${items.map(it => `<div class="roll-item" style="--rc:${RAR_COLOR[it.r]}">${itemIcon(it)}</div>`).join('')}</div></div>
+    <div id="rollRes" style="min-height:70px"><p class="muted">Крутится…</p></div>`, 'Закрыть');
+  const strip = document.getElementById('rollStrip'), box = strip.parentElement;
+  const step = 86, target = WIN * step + 40 - box.clientWidth / 2 + (Math.random() * 50 - 25);
+  strip.style.transform = 'translateX(0)';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    strip.style.transition = 'transform 4s cubic-bezier(.12,.75,.2,1)';
+    strip.style.transform = `translateX(${-target}px)`;
+  }));
+  let tick = setInterval(() => haptic('soft'), 180);
+  setTimeout(() => {
+    clearInterval(tick); rolling = false;
+    const msg = applyItem(win);
+    if (win.t === 'drill') renderDrillAnim();
+    save(true); build(); update();
+    if (win.r === 'march' || win.r === 'secret' || win.r === 'legend') hapticOk(); else haptic('heavy');
+    document.getElementById('rollRes').innerHTML = `<div style="color:${RAR_COLOR[win.r]};font-weight:800;font-size:13px">${RAR_NAME[win.r].toUpperCase()}</div>
+      <div style="font-size:20px;font-weight:800;margin:2px 0">${itemName(win)}</div><div class="muted">${msg}</div>
+      <button class="btn wide" style="margin:10px 0 0" onclick="openCase(${ci})" ${S.coins < c.cost ? 'disabled' : ''}>Открыть ещё · 🪙 ${fmt(c.cost)}</button>`;
+  }, 4200);
 }
 
 // ================= Перерождение =================
@@ -855,6 +939,13 @@ function build() {
     <div class="card ${PET_RARITY[p.rare] ? PET_RARITY[p.rare].card : ''}" id="pc-${i}"><div class="ico pet-ico">${petIcon(i)}<i id="pl-${i}"></i></div>
       <div class="info"><b>${p.name}${PET_RARITY[p.rare] ? ` <span class="${PET_RARITY[p.rare].tag}">${PET_RARITY[p.rare].name}</span>` : ''}</b><small id="pi-${i}"></small></div>
       <button class="btn" id="pb-${i}" onclick="buyPet(${i})"></button></div>`; }).join('');
+  $('caseList').innerHTML = CASES.map((c, ci) => {
+    const tot = Object.values(c.w).reduce((a, b) => a + b, 0);
+    return `<div class="case-card" style="--cc:${c.color}"><div class="case-top"><div class="case-box">${c.icon}</div>
+      <div class="info"><b style="font-size:17px">${c.name}</b><small id="cs-${ci}"></small></div></div>
+      <div class="case-odds">${Object.entries(c.w).map(([r, w]) => `<span style="color:${RAR_COLOR[r]}">${RAR_NAME[r]} ${(w / tot * 100).toFixed(w / tot < 0.1 ? 1 : 0)}%</span>`).join('')}</div>
+      <div class="case-btns"><button class="btn" id="cb-${ci}" onclick="openCase(${ci})">Открыть · 🪙 ${fmt(c.cost)}</button></div></div>`;
+  }).join('');
   $('rbDrills').innerHTML = REBORN_DRILLS.map(i => { const d = DRILLS[i]; return `
     <div class="card" id="rc-${i}"><div class="ico">${drillSvg(d.color)}</div>
       <div class="info"><b>${d.name} <span class="tag-epic">ЗА ${d.reborn} ПЕРЕРОЖД.</span></b><small id="ri-${i}"></small></div>
@@ -941,8 +1032,13 @@ function update() {
         $('pi-' + i).textContent = bestTier() >= p.need ? 'Мартовский питомец. Говорят, он прячется где-то в глубине шахты…' : `Мартовский питомец. Чтобы его найти, нужен ${DRILLS[p.need].name} или круче…`;
         return;
       }
+      if (!lvl) {
+        $('pc-' + i).classList.add('locked'); $('pl-' + i).style.display = 'none';
+        $('pi-' + i).innerHTML = Object.entries(p.b).map(([k, v]) => `+${v}% ${BOOST_TXT[k]}`).join(', ') + ' за уровень';
+        btn.textContent = '🎁 В кейсах'; btn.disabled = true; return;
+      }
+      $('pc-' + i).classList.remove('locked');
       const b = bulk(l => petCostAt(i, l), lvl, PET_MAX);
-      $('pc-' + i).classList.toggle('locked', lvl === 0 && S.coins < b.cost);
       $('pl-' + i).textContent = lvl ? lvl : '';
       $('pl-' + i).style.display = lvl ? '' : 'none';
       if (lvl >= PET_MAX) {
@@ -953,6 +1049,9 @@ function update() {
         btn.textContent = btnText(b, lvl === 0); btn.disabled = S.coins < b.cost;
       }
     });
+  }
+  if (tab === 'cases') {
+    CASES.forEach((c, ci) => { $('cb-' + ci).disabled = S.coins < c.cost || rolling; $('cs-' + ci).textContent = S.coins < c.cost ? `Не хватает 🪙 ${fmt(c.cost - S.coins)}` : 'Можно открыть!'; });
   }
   if (tab === 'reb') {
     const st = rebirthStatus();
