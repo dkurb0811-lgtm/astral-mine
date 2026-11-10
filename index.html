@@ -508,7 +508,7 @@ const BOOST_TXT = { luck: 'удача', money: 'монеты', speed: 'скор�
 // ================= Режим техработ =================
 // true  — игроки видят экран «Технические работы», в игру попадают только админы
 // false — игра открыта для всех
-const MAINTENANCE = true;
+const MAINTENANCE = false;
 // Кто может заходить во время техработ (ник Telegram без @ или имя, маленькими буквами)
 const ADMINS = ['itumka95', '@itumka95'];
 function isAdmin() {
@@ -531,9 +531,11 @@ function showMaintenance() {
 
 // ================= Панель теста (только для админов) =================
 function openAdmin() {
-  showModal(`<h3>🛠 Панель теста</h3><p class="muted" style="margin:6px 0 12px">Видишь только ты. Пока включён тест, твои результаты не идут в топ.</p>
+  showModal(`<h3>🛠 Панель теста</h3><p class="muted" style="margin:6px 0 12px">Видишь только ты. Ты остаёшься в топе со всем, что тут получишь.</p>
     <button class="btn wide" onclick="adminUnlock()">🔓 Открыть всё</button>
-    <button class="btn wide" onclick="adminCoins()">🪙 +1B монет</button>
+    <button class="btn wide" onclick="adminCoins(1e15)">🪙 +1Qa монет</button>
+    <button class="btn wide" onclick="adminCoins(1e18)">🪙 +1Qi монет</button>
+    <button class="btn wide" onclick="adminCoins(1e21)">🪙 +1Sx монет</button>
     <button class="btn wide pink" onclick="adminReset()">♻️ Сбросить всё (вернуть как новый)</button>`, 'Закрыть');
 }
 function adminUnlock() {
@@ -547,9 +549,10 @@ function adminUnlock() {
   document.getElementById('modal').classList.remove('show');
   showToast('🔓 Всё открыто для теста');
 }
-function adminCoins() {
-  S.tester = true; S.coins += 1e9; save(true); update();
-  showToast('🪙 +1B монет');
+function adminCoins(n) {
+  n = n || 1e15;
+  S.tester = true; S.coins += n; save(true); update();
+  showToast('🪙 +' + fmt(n) + ' монет');
 }
 function adminReset() {
   const keepT = Date.now();
@@ -581,7 +584,7 @@ let S = defaults();
 // ================= Формулы =================
 const fmt = n => {
   if (n < 1000) return Math.floor(n).toString();
-  const u = ['K','M','B','T','Qa']; let i = -1;
+  const u = ['K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc']; let i = -1;
   while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; }
   return n.toFixed(n < 10 ? 2 : n < 100 ? 1 : 0) + u[i];
 };
@@ -1263,7 +1266,7 @@ function playerInfo() {
   return null; // вне Telegram в топ не отправляем
 }
 async function submitScore() {
-  const p = playerInfo(); if (!lbOn() || !p || S.tester) return; // тестовый прогресс в топ не идёт
+  const p = playerInfo(); if (!lbOn() || !p || (S.tester && !isAdmin())) return; // тестовый прогресс в топ не идёт
   try {
     await fetch(`${SUPABASE_URL}/rest/v1/leaderboard`, {
       method: 'POST', headers: lbHeaders({ Prefer: 'resolution=merge-duplicates' }),
