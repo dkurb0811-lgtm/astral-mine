@@ -220,6 +220,13 @@
     </section>
 
     <section id="tab-top">
+      <div class="case-card" style="--cc:#2ee08a">
+        <div class="case-top"><div class="case-box">👥</div><div class="info"><b style="font-size:17px">Пригласи друга</b><small id="refInfo"></small></div></div>
+        <p class="muted" style="font-size:12px;margin:8px 0">За каждого друга: <b style="color:#2ee08a">+5% скорость навсегда</b> (до 20 друзей) и <b style="color:#4da3ff">📦 бесплатный Обычный кейс</b>. Друг получает 🪙 10K на старт.</p>
+        <div id="refGoals" class="case-odds"></div>
+        <div class="case-btns"><button class="btn" onclick="inviteFriend()">📨 Пригласить</button><button class="btn ghost" onclick="copyRef()">🔗 Ссылка</button></div>
+        <div id="refList" style="margin-top:8px"></div>
+      </div>
       <h2>🏆 Топ шахтёров</h2>
       <p class="muted" style="margin-bottom:12px">Место считается по всем монетам, заработанным за игру</p>
       <div class="card" id="myRank"></div>
@@ -566,7 +573,7 @@ function defaults() {
   return {
     coins: 0, items: Array(ASTRALS.length).fill(0), found: Array(ASTRALS.length).fill(0),
     drills: DRILLS.map((_, i) => i === 0 ? 0 : -1), pets: PETS.map(() => 0),
-    dv: 2, rebirths: 0, luck: 0, tap: 0, afkEff: 0, afkTime: 0, astral: 0, bg: 'space', bgs: ['space'], progress: 0, total: 0, earned: 0, t: Date.now()
+    dv: 2, rebirths: 0, luck: 0, tap: 0, refs: 0, refBy: '', freeCases: [0, 0, 0], afkEff: 0, afkTime: 0, astral: 0, bg: 'space', bgs: ['space'], progress: 0, total: 0, earned: 0, t: Date.now()
   };
 }
 let S = defaults();
@@ -580,7 +587,7 @@ const fmt = n => {
 };
 const pct = v => v >= 0.1 ? (v * 100).toFixed(1) + '%' : v >= 0.001 ? (v * 100).toFixed(2) + '%' : (v * 100).toFixed(3) + '%';
 const petBoost = kind => 1 + PETS.reduce((s, p, i) => s + (p.removed ? 0 : S.pets[i] * (p.b[kind] || 0)), 0) / 100;
-const speedMul = () => petBoost('speed') + secretBonus('speed') + S.rebirths * REB_SPEED;
+const speedMul = () => petBoost('speed') + secretBonus('speed') + S.rebirths * REB_SPEED + refBoost();
 const moneyMul = () => petBoost('money') + secretBonus('money');
 const luckMul  = () => petBoost('luck') + S.luck * 0.05 + S.astral * ASTRAL_LUCK + S.rebirths * REB_LUCK + bgLuck();
 const vipMul   = () => petBoost('vip');
@@ -831,6 +838,62 @@ function buyBg(id) {
   S.coins -= b.cost; S.bgs.push(id); setBg(id); showToast(`${b.icon} Фон «${b.name}» открыт!`);
 }
 
+// ================= Приглашения друзей =================
+const BOT_USERNAME = 'AstralMineGameBot';
+const REF_SPEED = 0.05, REF_MAX = 20;
+// Награды за количество друзей: при достижении — бесплатный кейс (номер кейса)
+const REF_GOALS = [{ n: 3, c: 1 }, { n: 10, c: 1 }, { n: 25, c: 2 }];
+const refBoost = () => Math.min(S.refs || 0, REF_MAX) * REF_SPEED;
+const myId = () => { const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user; return u ? u.id : null; };
+const refLink = () => `https://t.me/${BOT_USERNAME}?startapp=ref_${myId() || 0}`;
+let refNames = [];
+function inviteFriend() {
+  const text = '⛏️ Го копать астралы в Астральной шахте! По моей ссылке получишь 🪙 10K на старт';
+  const url = `https://t.me/share/url?url=${encodeURIComponent(refLink())}&text=${encodeURIComponent(text)}`;
+  try { tg.openTelegramLink(url); } catch (e) { window.open(url, '_blank'); }
+}
+function copyRef() {
+  const l = refLink();
+  const ok = () => showToast('🔗 Ссылка скопирована');
+  try { navigator.clipboard.writeText(l).then(ok, () => showModal(`<h3>Твоя ссылка</h3><p style="word-break:break-all;user-select:text">${l}</p>`, 'Закрыть')); }
+  catch (e) { showModal(`<h3>Твоя ссылка</h3><p style="word-break:break-all;user-select:text">${l}</p>`, 'Закрыть'); }
+}
+// Новый игрок пришёл по ссылке друга
+async function handleStartParam(isNew) {
+  const sp = tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param;
+  const me = myId();
+  if (!sp || !sp.startsWith('ref_') || !me || S.refBy || !isNew) return;
+  const inviter = sp.slice(4);
+  if (!/^[0-9]+$/.test(inviter) || inviter === String(me)) return;
+  S.refBy = inviter; S.coins += 10000; save(true);
+  setTimeout(() => showModal(`<div style="font-size:60px">👋</div><h3>Тебя пригласил друг!</h3><p class="muted">Держи 🪙 10K на старт. Удачной добычи!</p>`, 'Спасибо!'), 600);
+  if (!lbOn()) return;
+  const u = tg.initDataUnsafe.user;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/referrals`, { method: 'POST', headers: lbHeaders({ Prefer: 'resolution=ignore-duplicates' }),
+      body: JSON.stringify({ friend_id: me, inviter_id: +inviter, friend_name: ((u.first_name || '') + ' ' + (u.last_name || '')).trim().slice(0, 40) }) });
+  } catch (e) {}
+}
+// Проверяем, сколько друзей пришло по моей ссылке, и выдаём награды за новых
+async function checkRefs() {
+  const me = myId(); if (!lbOn() || !me) return;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/referrals?inviter_id=eq.${me}&select=friend_name&order=created_at.desc`, { headers: lbHeaders() });
+    if (!r.ok) return;
+    const rows = await r.json(); refNames = rows.map(x => x.friend_name || 'Друг');
+    const n = rows.length, was = S.refs || 0;
+    if (n > was) {
+      const add = n - was; S.refs = n;
+      S.freeCases[0] += add;
+      REF_GOALS.forEach(g => { if (was < g.n && n >= g.n) S.freeCases[g.c]++; });
+      save(true); hapticOk();
+      showModal(`<div style="font-size:60px">🎉</div><h3>${add > 1 ? `+${add} друга присоединились!` : 'Друг присоединился!'}</h3>
+        <p class="muted">Скорость +${Math.round(Math.min(n, REF_MAX) * REF_SPEED * 100)}% навсегда. Бесплатные кейсы ждут во вкладке 🎁 Кейсы!</p>`, 'Круто!');
+    }
+    update();
+  } catch (e) {}
+}
+
 // ================= Кейсы =================
 const RAR_COLOR = { rare: '#4da3ff', epic: '#b46bff', myth: '#ff5a5a', legend: '#ffd75e', march: '#ff4fa3', secret: '#3affd0' };
 const RAR_NAME = { rare: 'Редкий', epic: 'Эпический', myth: 'Мифический', legend: 'Легендарный', march: 'Мартовский', secret: 'Секретный бур' };
@@ -863,10 +926,11 @@ function applyItem(it) {
   return `Уже максимум — возвращено 🪙 ${fmt(back)}`;
 }
 let lastCase = 0, rolling = false;
-function openCase(ci) {
+function openCase(ci, free) {
   const c = CASES[ci];
-  if (rolling || S.coins < c.cost) return;
-  S.coins -= c.cost; lastCase = ci; rolling = true; haptic('medium');
+  if (free) { if (rolling || !(S.freeCases[ci] > 0)) return; S.freeCases[ci]--; }
+  else { if (rolling || S.coins < c.cost) return; S.coins -= c.cost; }
+  lastCase = ci; rolling = true; haptic('medium');
   const win = rollCase(c);
   const N = 40, WIN = 34, items = [];
   for (let k = 0; k < N; k++) items.push(k === WIN ? win : rollCase(c));
@@ -1026,7 +1090,8 @@ function build() {
     return `<div class="case-card" style="--cc:${c.color}"><div class="case-top"><div class="case-box">${c.icon}</div>
       <div class="info"><b style="font-size:17px">${c.name}</b><small id="cs-${ci}"></small></div></div>
       <div class="case-odds">${Object.entries(c.w).map(([r, w]) => `<span style="color:${RAR_COLOR[r]}">${RAR_NAME[r]} ${(+(w / tot * 100).toFixed(2)).toString()}%</span>`).join('')}${BGS.filter(b => b.fromCase === ci).map(b => `<span style="color:#fff">+ фон ${b.icon} ${b.name} ${BG_CASE_CHANCE * 100}%</span>`).join('')}</div>
-      <div class="case-btns"><button class="btn" id="cb-${ci}" onclick="openCase(${ci})">Открыть · 🪙 ${fmt(c.cost)}</button></div></div>`;
+      <div class="case-btns"><button class="btn" id="cb-${ci}" onclick="openCase(${ci})">Открыть · 🪙 ${fmt(c.cost)}</button>
+      <button class="btn pink" id="cf-${ci}" onclick="openCase(${ci}, true)" style="display:none"></button></div></div>`;
   }).join('');
   $('rbDrills').innerHTML = REBORN_DRILLS.map(i => { const d = DRILLS[i]; return `
     <div class="card" id="rc-${i}"><div class="ico">${drillSvg(d.color)}</div>
@@ -1070,6 +1135,7 @@ function update() {
     if (moneyMul() > 1) chips.push(`💰 монеты ×${moneyMul().toFixed(2)}`);
     if (luckMul() > 1) chips.push(`🍀 удача ×${luckMul().toFixed(2)}`);
     if (tapMul() > 1) chips.push(`👊 тап ×${tapMul().toFixed(2)}`);
+    if (refBoost() > 0) chips.push(`👥 друзья +${Math.round(refBoost() * 100)}% скорость`);
     if (bgLuck() > 0) chips.push(`${curBg().icon} фон +${Math.round(bgLuck() * 100)}% удача`);
     if (vipMul() > 1) chips.push(`💎 VIP/Ультра ×${vipMul().toFixed(2)}`);
     $('boosts').innerHTML = chips.map(c => `<span class="boost-chip">${c}</span>`).join('');
@@ -1141,7 +1207,14 @@ function update() {
     });
   }
   if (tab === 'cases') {
+    CASES.forEach((c, ci) => { const f = S.freeCases[ci] || 0, b = $('cf-' + ci); b.style.display = f ? '' : 'none'; b.textContent = `🎁 Бесплатно (${f})`; b.disabled = rolling; });
     CASES.forEach((c, ci) => { $('cb-' + ci).disabled = S.coins < c.cost || rolling; $('cs-' + ci).textContent = S.coins < c.cost ? `Не хватает 🪙 ${fmt(c.cost - S.coins)}` : 'Можно открыть!'; });
+  }
+  if (tab === 'top') {
+    const n = S.refs || 0;
+    $('refInfo').textContent = `Друзей: ${n} · бонус +${Math.round(refBoost() * 100)}% скорость`;
+    $('refGoals').innerHTML = REF_GOALS.map(g => `<span style="color:${n >= g.n ? '#2ee08a' : '#a99cc9'}">${n >= g.n ? '✅' : '🎯'} ${g.n} друзей → ${CASES[g.c].icon} ${CASES[g.c].name}</span>`).join('');
+    $('refList').innerHTML = refNames.length ? `<p class="muted" style="font-size:12px">Твои друзья: ${refNames.slice(0, 20).map(esc).join(', ')}${refNames.length > 20 ? '…' : ''}</p>` : '';
   }
   if (tab === 'reb') {
     const st = rebirthStatus();
@@ -1177,7 +1250,7 @@ document.querySelectorAll('nav button').forEach(b => b.addEventListener('click',
   document.querySelectorAll('nav button').forEach(x => x.classList.toggle('active', x === b));
   document.querySelectorAll('section').forEach(s => s.classList.toggle('active', s.id === 'tab-' + tab));
   haptic('soft'); update();
-  if (tab === 'top') loadTop();
+  if (tab === 'top') { loadTop(); checkRefs(); }
 }));
 
 // ================= Таблица лидеров =================
@@ -1312,6 +1385,8 @@ async function init() {
   setInterval(() => save(false), 5000);
   setInterval(() => save(true), 30000);
   setInterval(submitScore, 60000); submitScore();
+  handleStartParam(!best).then(checkRefs);
+  setInterval(checkRefs, 120000);
   setInterval(() => tryFinds(1), 1000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(true); });
   window.addEventListener('pagehide', () => save(true));
