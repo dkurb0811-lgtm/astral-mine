@@ -34,6 +34,14 @@
   .rock.shake { animation: shake .15s; }
   @keyframes shake { 25% { transform: translate(-4px,2px) rotate(-2deg); } 75% { transform: translate(4px,-2px) rotate(2deg); } }
   .rock svg { position: absolute; }
+  .astral-tap { width: 230px; height: 230px; margin-top: 46px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    filter: drop-shadow(0 0 22px rgba(180,107,255,.55)); transition: transform .06s; touch-action: manipulation; }
+  .astral-tap:active { transform: scale(.94); }
+  .astral-tap.shake { animation: shake .15s; }
+  .astral-tap.levelup { animation: lvlpop .6s ease-out; }
+  @keyframes lvlpop { 0% { transform: scale(.4) rotate(-20deg); filter: drop-shadow(0 0 60px #fff); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+  .astral-tap img, .astral-tap svg { pointer-events: none; }
+  .astral-up { margin-top: 12px; border-color: rgba(180,107,255,.45); background: linear-gradient(135deg, rgba(180,107,255,.16), rgba(255,255,255,.04)); }
   .drill-anim { position: absolute; top: 0; left: 50%; transform: translateX(-50%); animation: bob .5s infinite ease-in-out; z-index: 2; }
   @keyframes bob { 50% { transform: translate(-50%, 14px); } }
   .float { position: absolute; display: flex; align-items: center; gap: 4px; font-weight: 800; font-size: 14px;
@@ -94,6 +102,9 @@
   .mega-text { background: linear-gradient(90deg,#ff3b3b,#ffd75e,#4dff88,#3ab0e8,#b46bff); -webkit-background-clip: text; background-clip: text; color: transparent; font-size: 20px; }
   .tag-legend { background: linear-gradient(90deg,#ffd75e,#ff4fa3); color: #2a0a1a; }
   .tag-epic { background: #9a4dff; color: #fff; }
+  .tag-myth { font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 6px; vertical-align: middle; margin-left: 4px; background: linear-gradient(90deg,#ff3b5c,#ff8a3d); color: #fff; }
+  .pet-myth { border: 1.5px solid rgba(255,90,90,.7); background: linear-gradient(135deg, rgba(255,59,92,.18), rgba(255,138,61,.08)); }
+  .pet-myth .pet-ico { border-color: #ff6b6b; box-shadow: 0 0 12px rgba(255,90,90,.6); }
   .tag-rare { font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 6px; vertical-align: middle; margin-left: 4px; background: #2f7fe0; color: #fff; }
   .pet-rare { border-color: rgba(77,163,255,.5); background: linear-gradient(135deg, rgba(77,163,255,.12), rgba(255,255,255,.04)); }
   .card .info b { display: block; font-size: 15px; }
@@ -142,9 +153,14 @@
     <section id="tab-mine" class="active">
       <div class="mine-area" id="mineArea">
         <div class="drill-anim" id="drillAnim"></div>
-        <div class="rock" id="rock"></div>
+        <div class="astral-tap" id="rock"></div>
       </div>
-      <p class="muted" style="text-align:center">Тапай по камню, буры копают астралы и без тебя</p>
+      <p class="muted" style="text-align:center">Тапай по астралу, буры копают и без тебя</p>
+      <div class="card astral-up" id="astralUp">
+        <div class="ico" id="auNext"></div>
+        <div class="info"><b id="auName"></b><small id="auInfo"></small></div>
+        <button class="btn" id="auBtn" onclick="upAstral()"></button>
+      </div>
       <div class="stats-row">
         <div class="stat"><b id="perSec">0</b><span class="muted">астр./сек</span></div>
         <div class="stat"><b id="tapStat">0</b><span class="muted">за тап</span></div>
@@ -157,7 +173,7 @@
 
     <section id="tab-drills">
       <h2>Буры</h2>
-      <p class="muted" style="margin-bottom:12px">Чем круче бур, тем быстрее он копает и тем более редкие астралы ему доступны. Сырный (VIP) выпадает с Золотого бура, Мартовский (ультра) — с Алмазного.</p>
+      <p class="muted" style="margin-bottom:12px">Чем круче бур, тем быстрее он копает и тем более редкие астралы ему доступны. Сырный (VIP) выпадает с Золотого бура, Мартовский (ультра, самый редкий) — только с Плазменного.</p>
 <div class="buybar"><button data-buy="1" class="on">x1</button><button data-buy="10">x10</button><button data-buy="max">MAX</button></div>
       <div id="drillList"></div>
       <h2 style="margin-top:16px">Улучшения</h2>
@@ -216,7 +232,7 @@ const TIERS = [
   { name: 'Эпические',   color: '#b46bff', price: 120 },
   { name: 'Легендарные', color: '#ffb02e', price: 1000 },
   { name: 'VIP',         color: '#ff4fa3', price: 20000 },
-  { name: 'Ультра',      color: '#ff3b3b', price: 200000 },
+  { name: 'Ультра',      color: '#ff3b3b', price: 1000000 },
 ];
 const TIER_ONE = ['Обычный', 'Редкий', 'Эпический', 'Легендарный', 'VIP', 'УЛЬТРА-РЕДКИЙ'];
 
@@ -224,103 +240,167 @@ const TIER_ONE = ['Обычный', 'Редкий', 'Эпический', 'Ле�
 // c — цвета градиента, fx — особый эффект на картинке
 const ASTRALS = [
   // Обычные
-  { n: 'Хрустальный',  t: 0, c: ['#ffffff','#dfe9f5','#b9c8dc'] },
-  { n: 'Серебряный',   t: 0, c: ['#f2f2f2','#a8adb5','#6c727c'] },
-  { n: 'Дымчатый',     t: 0, c: ['#9ea2aa','#5a5e66','#2d3036'] },
-  { n: 'Розовый',      t: 0, c: ['#ffd6ea','#ff8cc0','#d4558f'] },
-  { n: 'Небесный',     t: 0, c: ['#e0f4ff','#7cc6ff','#3b82d6'] },
-  { n: 'Мятный',       t: 0, c: ['#e3ffe9','#7de8a0','#2fae5e'] },
-  { n: 'Лимонный',     t: 0, c: ['#fffbd1','#ffe45c','#d9a91a'] },
-  { n: 'Персиковый',   t: 0, c: ['#ffe6cf','#ffad6b','#e0702e'] },
-  // Редкие
-  { n: 'Рубиновый',    t: 1, c: ['#ff9aa8','#e0233f','#7a0d1f'] },
-  { n: 'Изумрудный',   t: 1, c: ['#b8ffd0','#16c75a','#08602b'] },
-  { n: 'Сапфировый',   t: 1, c: ['#a8c8ff','#2856e0','#0f2470'] },
-  { n: 'Аметистовый',  t: 1, c: ['#e6c8ff','#9a4dff','#4b1a8a'] },
-  { n: 'Золотой',      t: 1, c: ['#fff3b0','#f2c230','#a8730a'] },
-  { n: 'Бирюзовый',    t: 1, c: ['#c6fff6','#2fd8c4','#0f7d74'] },
-  { n: 'Медный',       t: 1, c: ['#f2c2a0','#b0643a','#5e2e16'] },
-  { n: 'Лаймовый',     t: 1, c: ['#f2ffb0','#a8e02a','#4f7d0a'] },
+  { n: 'Коралловый', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/1_1.png' },
+  { n: 'Персиковый', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/1_2.png' },
+  { n: 'Золотистый', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/1_3.png' },
+  { n: 'Мятный', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/1_4.png' },
+  { n: 'Травяной', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/1_5.png' },
+  { n: 'Небесный', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/1_6.png' },
+  { n: 'Сиреневый', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/1_7.png' },
+  { n: 'Розовый', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/2_1.png' },
+  { n: 'Жемчужный', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/2_2.png' },
+  { n: 'Чёрный', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/2_3.png' },
+  { n: 'Голубой', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/2_4.png' },
+  { n: 'Рубиновый', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/2_5.png' },
+  { n: 'Весенний', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/2_6.png' },
+  { n: 'Сапфировый', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/2_7.png' },
+  { n: 'Лазурный', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/3_1.png' },
+  { n: 'Сумеречный', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/3_2.png' },
+  { n: 'Хрустальный', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/3_3.png' },
+  { n: 'Аметистовый', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/3_4.png' },
+  { n: 'Радужный', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/3_5.png' },
+  { n: 'Серебряный', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/3_6.png' },
+  { n: 'Фламинго', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/3_7.png' },
+  { n: 'Арбузный', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/4_1.png' },
+  { n: 'Лаймовый', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/4_2.png' },
+  { n: 'Опаловый', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/4_3.png' },
+  { n: 'Осенний', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/4_4.png' },
+  { n: 'Поп-арт', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/4_5.png' },
+  { n: 'Пиксельный', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/4_6.png' },
+  { n: 'Токсичный', t: 0, c: ['#ffffff','#c9d6ff','#8a9ccc'], img: 'img/astrals/4_7.png' },
+  // Средние (редкие)
+  { n: 'Золотой', t: 1, c: ['#c6e8ff','#4da3ff','#1f4fa8'], img: 'img/astrals/5_1.png' },
+  { n: 'Платиновый', t: 1, c: ['#c6e8ff','#4da3ff','#1f4fa8'], img: 'img/astrals/5_2.png' },
+  { n: 'Янтарный', t: 1, c: ['#c6e8ff','#4da3ff','#1f4fa8'], img: 'img/astrals/5_3.png' },
+  { n: 'Золотая рамка', t: 1, c: ['#c6e8ff','#4da3ff','#1f4fa8'], img: 'img/astrals/5_4.png' },
+  { n: 'Ледяная рамка', t: 1, c: ['#c6e8ff','#4da3ff','#1f4fa8'], img: 'img/astrals/5_5.png' },
+  { n: 'Сапфир', t: 1, c: ['#c6e8ff','#4da3ff','#1f4fa8'], img: 'img/astrals/5_6.png' },
+  { n: 'Галактический', t: 1, c: ['#c6e8ff','#4da3ff','#1f4fa8'], img: 'img/astrals/5_7.png' },
+  { n: 'Мандариновый', t: 1, c: ['#c6e8ff','#4da3ff','#1f4fa8'], img: 'img/astrals/6_1.png' },
+  { n: 'Призрачный', t: 1, c: ['#c6e8ff','#4da3ff','#1f4fa8'], img: 'img/astrals/6_2.png' },
+  { n: 'Графитовый', t: 1, c: ['#c6e8ff','#4da3ff','#1f4fa8'], img: 'img/astrals/6_3.png' },
+  { n: 'Водный', t: 1, c: ['#c6e8ff','#4da3ff','#1f4fa8'], img: 'img/astrals/6_4.png' },
+  { n: 'Ракетный', t: 1, c: ['#c6e8ff','#4da3ff','#1f4fa8'], img: 'img/astrals/6_5.png' },
+  { n: 'Шоколадный', t: 1, c: ['#c6e8ff','#4da3ff','#1f4fa8'], img: 'img/astrals/6_6.png' },
   // Эпические
-  { n: 'Радужный',     t: 2, c: ['#ff5c5c','#ffd84d','#4dff88','#4db8ff','#b84dff'] },
-  { n: 'Перламутровый',t: 2, c: ['#ffffff','#ffd6f5','#d6f0ff','#e8d6ff'] },
-  { n: 'Закатный',     t: 2, c: ['#ffe14d','#ff8a3d','#e8344f','#7a1f6b'] },
-  { n: 'Ледяной',      t: 2, c: ['#ffffff','#b8f2ff','#5cc8ff'], fx: 'sparkle' },
-  { n: 'Сердечный',    t: 2, c: ['#fff0f6','#ffc2dc','#a8e0ff'], fx: 'heart' },
-  { n: 'Токсичный',    t: 2, c: ['#d8ff8a','#4be04b','#1a7d1a'], fx: 'toxic' },
-  { n: 'Обсидиановый', t: 2, c: ['#6b6b78','#2a2a33','#0a0a10'] },
-  { n: 'Мозаичный',    t: 2, c: ['#ff3cac','#ffe600','#00e0ff'], fx: 'mosaic' },
+  { n: 'Сердечный', t: 2, c: ['#f0d6ff','#b46bff','#5a2a9a'], img: 'img/astrals/6_7.png' },
+  { n: 'Граффити', t: 2, c: ['#f0d6ff','#b46bff','#5a2a9a'], img: 'img/astrals/7_1.png' },
+  { n: 'Бабочки', t: 2, c: ['#f0d6ff','#b46bff','#5a2a9a'], img: 'img/astrals/7_3.png' },
+  { n: 'Колючий', t: 2, c: ['#f0d6ff','#b46bff','#5a2a9a'], img: 'img/astrals/7_4.png' },
+  { n: 'Лиановый', t: 2, c: ['#f0d6ff','#b46bff','#5a2a9a'], img: 'img/astrals/7_5.png' },
+  { n: 'Рыбки', t: 2, c: ['#f0d6ff','#b46bff','#5a2a9a'], img: 'img/astrals/7_6.png' },
+  { n: 'Узорный', t: 2, c: ['#f0d6ff','#b46bff','#5a2a9a'], img: 'img/astrals/7_7.png' },
   // Легендарные
-  { n: 'Галактический',t: 3, c: ['#ff7ae0','#5b3cff','#120a40'], fx: 'stars' },
-  { n: 'Огненный',     t: 3, c: ['#fff27a','#ff9a1f','#e8341c'], fx: 'flame' },
-  { n: 'Змеиный',      t: 3, c: ['#d8ff9a','#5fcf3a','#1f6b1a'], fx: 'band' },
-  { n: 'Цветущий',     t: 3, c: ['#ffffff','#ffd1f0','#c8f7d8'], fx: 'flower' },
-  { n: 'Кровавый',     t: 3, c: ['#ff6b6b','#8a0a1a','#2a0005'] },
-  { n: 'Лунный',       t: 3, c: ['#ffffff','#c9d6ff','#6a78b8'], fx: 'moon' },
-  { n: 'Призрачный',   t: 3, c: ['#ffffff','#e6f0ff','#c8b8ff'], fx: 'ghost' },
-  { n: 'Солнечный',    t: 3, c: ['#ffffff','#ffe9a8','#ffb21f'], fx: 'sparkle' },
+  { n: 'Змеиный', t: 3, c: ['#fff27a','#ff9a1f','#e8341c'], img: 'img/astrals/7_2.png' },
+  { n: 'Огненный', t: 3, c: ['#fff27a','#ff9a1f','#e8341c'], img: 'img/astrals/8_1.png' },
   // VIP
-  { n: 'Сырный астрал',   t: 4, c: ['#fff6b0','#ffd34a','#f0a020'], fx: 'cheese' },
+  { n: 'Сырный астрал',   t: 4, c: ['#fff6b0','#ffd34a','#f0a020'], fx: 'cheese', img: 'img/astrals/vip.png' },
   // Ультра-редкий
-  { n: 'Мартовский астрал', t: 5, c: ['#ff8ab8','#e8346f','#3ab0e8'], fx: 'planes' },
+  { n: 'Мартовский астрал', t: 5, c: ['#ff8ab8','#e8346f','#3ab0e8'], fx: 'planes', img: 'img/astrals/ultra.png' },
 ];
 // Свои картинки: положи файлы в папку img рядом с index.html.
-// Астралы: img/a1.png ... img/a34.png (по порядку списка выше)
+// Астралы: img/astrals/РЯД_СТОЛБЕЦ.png (как в сетке на скриншоте), VIP: img/astrals/vip.png, Ультра: img/astrals/ultra.png
 // Питомцы: pet1 = Растовуха, pet2 = 42, pet3 = Дымка, pet4 = 42 Прайм, pet5 = WW, pet6 = Лорсик, pet7 = Рутик, pet8 = Хоспик
-ASTRALS.forEach((a, i) => a.img = `img/a${i + 1}.png`);
+const VIP_I = ASTRALS.findIndex(a => a.t === 4), ULTRA_I = ASTRALS.findIndex(a => a.t === 5);
+// Уровни астрала, по которому тапаешь: модели от обычных к легендарным
+const ASTRAL_LEVELS = ASTRALS.map((a, i) => i).filter(i => ASTRALS[i].t <= 3).sort((x, y) => ASTRALS[x].t - ASTRALS[y].t || x - y);
+const ASTRAL_MAX = ASTRAL_LEVELS.length - 1;
+const astralCostAt = l => Math.ceil(250 * Math.pow(1.5, l));
+const ASTRAL_LUCK = 0.06; // +6% удачи за каждый уровень астрала
 const BY_TIER = TIERS.map((_, t) => ASTRALS.map((a, i) => a.t === t ? i : -1).filter(i => i >= 0));
 
 // ================= Буры =================
 const DRILLS = [
-  { name: 'Ручной бур',     power: 1,    cost: 0,         color: '#9aa0a6' },
-  { name: 'Медный бур',     power: 4,    cost: 300,       color: '#d9824a' },
-  { name: 'Железный бур',   power: 12,   cost: 4000,      color: '#c9ced6' },
-  { name: 'Стальной бур',   power: 35,   cost: 40000,     color: '#7b8794' },
-  { name: 'Золотой бур',    power: 100,  cost: 350000,     color: '#f5c542' },
-  { name: 'Алмазный бур',   power: 300,  cost: 3000000,    color: '#5ee7ff' },
-  { name: 'Плазменный бур', power: 900,  cost: 30000000,   color: '#ff5ce1' },
-  { name: 'Астральный бур', power: 3000, cost: 250000000,  color: '#b46bff' },
-  // Секретные буры: не продаются, случайно находятся в шахте. luck/vip — дополнительные бонусы
-  { name: 'Флоурит', power: 6000,  cost: 60000000,  color: '#3affd0', secret: true, luck: 0.5, vip: 0, need: 3, text: 'Бур из глубин, названный в честь Флоу' },
-  { name: 'Кенриум', power: 25000, cost: 400000000, color: '#ff3b3b', secret: true, luck: 1.5, vip: 0.75, need: 6, text: 'Самый редкий бур в игре, назван в честь Кенри' },
+  { name: 'Ручной бур',     power: 1,    cost: 0,          color: '#9aa0a6' },
+  { name: 'Каменный бур',   power: 2.2,  cost: 120,        color: '#8a7f73' },
+  { name: 'Медный бур',     power: 4.6,  cost: 600,        color: '#d9824a' },
+  { name: 'Бронзовый бур',  power: 10,   cost: 2800,       color: '#b5803a' },
+  { name: 'Железный бур',   power: 21,   cost: 13000,      color: '#c9ced6' },
+  { name: 'Стальной бур',   power: 45,   cost: 60000,      color: '#7b8794' },
+  { name: 'Титановый бур',  power: 95,   cost: 280000,     color: '#a3b8c9' },
+  { name: 'Золотой бур',    power: 200,  cost: 1300000,    color: '#f5c542' },
+  { name: 'Изумрудный бур', power: 420,  cost: 6000000,    color: '#2ee08a' },
+  { name: 'Алмазный бур',   power: 880,  cost: 28000000,   color: '#5ee7ff' },
+  { name: 'Плазменный бур', power: 1850, cost: 130000000,  color: '#ff5ce1' },
+  { name: 'Квантовый бур',  power: 3900, cost: 600000000,  color: '#7b5cff' },
+  { name: 'Астральный бур', power: 8200, cost: 2800000000, color: '#b46bff' },
+  // Секретные буры: не продаются, случайно находятся в шахте. luck/vip — дополнительные бонусы, need — с какого бура могут найтись
+  // speed / money — бонус к скорости и монетам (0.4 = +40%), растёт на 5% за каждый уровень бура; rate — шанс найти за 1 сек
+  // power у секретных буров выше, чем у любого обычного бура того же уровня
+  { name: 'Флоурит',    power: 10000, cost: 60000000,  color: '#3affd0', secret: true, speed: 0.4, money: 0,   need: 5,  rate: 1 / 30000,  text: 'Бур в честь Флоу. Сильно ускоряет добычу!' },
+  { name: 'Кенриум',    power: 25000, cost: 400000000, color: '#ff3b3b', secret: true, speed: 1.5, money: 1.5, need: 10, rate: 1 / 200000, top: true, text: 'Самый редкий бур в игре, в честь Кенри. Скорость и монеты в разы больше!' },
+  { name: 'Электронит', power: 13000, cost: 150000000, color: '#ffe14d', secret: true, speed: 0,   money: 0.4, need: 7,  rate: 1 / 60000,  text: 'Бур в честь Электрона. Приносит больше монет!' },
 ];
+// Старые сохранения (8 обычных буров) → новые номера буров
+const OLD_DRILL_MAP = [0, 2, 4, 5, 7, 9, 10, 12, 13, 14];
 const REG_DRILLS = DRILLS.map((d, i) => d.secret ? -1 : i).filter(i => i >= 0);
-const SECRET_DRILLS = DRILLS.map((d, i) => d.secret ? i : -1).filter(i => i >= 0);
-const secretBonus = k => SECRET_DRILLS.reduce((s, i) => s + (S.drills[i] >= 0 ? DRILLS[i][k] : 0), 0);
+const SECRET_DRILLS = DRILLS.map((d, i) => d.secret ? i : -1).filter(i => i >= 0).sort((a, b) => DRILLS[a].need - DRILLS[b].need);
+const secretBonusAt = (i, l) => k => (DRILLS[i][k] || 0) * (1 + 0.05 * l);
+const secretBonus = k => SECRET_DRILLS.reduce((s, i) => s + (S.drills[i] >= 0 ? secretBonusAt(i, S.drills[i])(k) : 0), 0);
 
 // ================= Питомцы-бусты =================
 // b — бусты за 1 уровень в процентах
 const PETS = [
-  { name: 'Растовуха',  emoji: '🐹', cost: 400,     b: { luck: 10 },                         img: 'img/pet1.png', rare: 'rare' },
-  { name: '42',         emoji: '🐩', cost: 1200,    b: { money: 15 },                        img: 'img/pet2.png', rare: 'rare' },
-  { name: 'Дымка',      emoji: '🐈', cost: 5000,    b: { speed: 10 },                        img: 'img/pet3.png', rare: 'rare' },
-  { name: '42 Прайм',   emoji: '🧸', cost: 40000,   b: { tap: 30, luck: 5 },                 img: 'img/pet4.png', rare: 'epic', removed: true },
-  { name: 'WW',         emoji: '🐕', cost: 2500000, b: { vip: 35, speed: 15, money: 15, luck: 10 }, img: 'img/pet5.png', rare: 'legend' },
+  { name: 'Растовуха',  emoji: '🐹', cost: 10000000,  b: { luck: 40 },  img: 'img/pet1.png', rare: 'march', hidden: true, need: 5, rate: 1 / 40000 },
+  { name: '42',         emoji: '🐩', cost: 15000000,  b: { money: 45 }, img: 'img/pet2.png', rare: 'march', hidden: true, need: 6, rate: 1 / 50000 },
+  { name: 'Дымка',      emoji: '🐈', cost: 20000000,  b: { speed: 40 }, img: 'img/pet3.png', rare: 'march', hidden: true, need: 7, rate: 1 / 60000 },
+  { name: '42 Прайм',   emoji: '🧸', cost: 40000,   b: { tap: 30, luck: 5 },                 img: 'img/pet4.png', rare: 'march', removed: true },
+  { name: 'WW',         emoji: '🐕', cost: 70000000,  b: { vip: 60, speed: 35, money: 35, luck: 25 }, img: 'img/pet5.png', rare: 'march', hidden: true, need: 10, rate: 1 / 150000 },
   // Скрытый МЕГА-редкий питомец: не продаётся, случайно находится в шахте (с Алмазного бура)
-  { name: 'Лорсик',     emoji: '🐆', cost: 20000000, b: { speed: 40, money: 40, luck: 25, vip: 60, tap: 40 }, img: 'img/pet6.png', rare: 'mega', hidden: true },
-  { name: 'Рутик',      emoji: '🐶', cost: 300000,  b: { money: 25, tap: 20 },                   img: 'img/pet7.png', rare: 'epic' },
-  { name: 'Хоспик',     emoji: '🐈‍⬛', cost: 1200000, b: { luck: 20, speed: 15, vip: 20 },          img: 'img/pet8.png', rare: 'epic' },
+  { name: 'Лорсик',     emoji: '🐆', cost: 100000000, b: { speed: 60, money: 60, luck: 40, vip: 80, tap: 60 }, img: 'img/pet6.png', rare: 'march', hidden: true, need: 11, rate: 1 / 250000, text: 'Бенгальский кот из самой глубины шахты. Ускоряет всё сразу!' },
+  { name: 'Рутик',      emoji: '🐶', cost: 30000000,  b: { money: 45, tap: 40 }, img: 'img/pet7.png', rare: 'march', hidden: true, need: 8, rate: 1 / 80000 },
+  { name: 'Хоспик',     emoji: '🐈‍⬛', cost: 45000000,  b: { luck: 40, speed: 30, vip: 40 }, img: 'img/pet8.png', rare: 'march', hidden: true, need: 9, rate: 1 / 100000 },
+  // Мифические (между эпическими и легендарными)
+  { name: 'Сушик',   emoji: '🍣', cost: 250000, b: { money: 18 }, img: 'img/pet23.png', rare: 'myth' },
+  { name: 'Лягуш',   emoji: '🐸', cost: 350000, b: { luck: 18 },  img: 'img/pet24.png', rare: 'myth' },
+  { name: 'Малинка', emoji: '🍓', cost: 450000, b: { speed: 18 }, img: 'img/pet25.png', rare: 'myth' },
+  // Легендарные (сильнее мифических)
+  { name: 'Заспа', emoji: '🙂', cost: 7000000, b: { luck: 33 },             img: 'img/pet18.png', rare: 'legend' },
+  { name: 'Гусь',  emoji: '🐻', cost: 1100000, b: { speed: 22 },            img: 'img/pet19.png', rare: 'legend' },
+  { name: 'Корал', emoji: '🦆', cost: 2000000, b: { money: 25 },            img: 'img/pet20.png', rare: 'legend' },
+  { name: 'Вака',  emoji: '🐢', cost: 3500000, b: { tap: 35 },              img: 'img/pet21.png', rare: 'legend' },
+  { name: 'Атер',  emoji: '🐈‍⬛', cost: 6000000, b: { vip: 30 },            img: 'img/pet22.png', rare: 'legend' },
+  // Эпические (сильнее редких, слабее мартовских)
+  { name: 'Улыбака',  emoji: '😺', cost: 15000,  b: { luck: 12 },          img: 'img/pet13.png', rare: 'epic' },
+  { name: 'Лизун',    emoji: '👅', cost: 30000,  b: { money: 14 },         img: 'img/pet14.png', rare: 'epic' },
+  { name: 'Бабочкин', emoji: '🦋', cost: 60000,  b: { speed: 12 },         img: 'img/pet15.png', rare: 'epic' },
+  { name: 'Ням-Ням',  emoji: '😛', cost: 110000, b: { tap: 18 },           img: 'img/pet16.png', rare: 'epic' },
+  { name: 'Детектив', emoji: '🧐', cost: 200000, b: { vip: 15, luck: 5 },  img: 'img/pet17.png', rare: 'epic' },
+  // Редкие (дешёвые, слабые бусты)
+  { name: 'Крокодилдо',      emoji: '🐊', cost: 150,  b: { luck: 5 },  img: 'img/pet9.png',  rare: 'rare' },
+  { name: 'Бомбини Гуссини', emoji: '🪿', cost: 400,  b: { speed: 5 }, img: 'img/pet10.png', rare: 'rare' },
+  { name: 'Триппи Троппа',   emoji: '🐟', cost: 900,  b: { money: 6 }, img: 'img/pet11.png', rare: 'rare' },
+  { name: 'Трик Барабум',    emoji: '🌿', cost: 2000, b: { tap: 8 },   img: 'img/pet12.png', rare: 'rare' },
 ];
 const ITUMKA = PETS.findIndex(p => p.name === 'Лорсик');
 // Порядок показа питомцев в списке (от простых к самым редким)
-const PET_ORDER = [0, 1, 2, 6, 7, 4, 5]; // 42 Прайм (индекс 3) убран из игры
+// Редкости питомцев (от простой к самой редкой): редкий → эпический → мифический → легендарный → мартовский
+const PET_RARITY = {
+  rare:   { name: 'РЕДКИЙ',      tag: 'tag-rare',   card: 'pet-rare' },
+  epic:   { name: 'ЭПИЧЕСКИЙ',   tag: 'tag-epic',   card: 'pet-epic' },
+  myth:   { name: 'МИФИЧЕСКИЙ',  tag: 'tag-myth',   card: 'pet-myth' },
+  legend: { name: 'ЛЕГЕНДАРНЫЙ', tag: 'tag-legend', card: 'pet-legend' },
+  march:  { name: 'МАРТОВСКИЙ',  tag: 'tag-mega',   card: 'pet-mega' },
+};
+// Порядок показа питомцев: от самых простых (редкие) к мартовским
+const PET_ORDER = PETS.map((p, i) => i).filter(i => !PETS[i].removed).sort((x, y) => Object.keys(PET_RARITY).indexOf(PETS[x].rare) - Object.keys(PET_RARITY).indexOf(PETS[y].rare) || (PETS[x].hidden ? 1 : 0) - (PETS[y].hidden ? 1 : 0) || PETS[x].cost - PETS[y].cost);
 // Шанс найти Лорсика за 1 секунду работы буров
 function itumkaChance() {
-  const bt = bestTier(); if (bt < 5) return 0;
-  return (1 / 25000) * (1 + 0.5 * (bt - 5)) * luckMul();
+  const bt = bestTier(); if (bt < 9) return 0;
+  return (1 / 25000) * (1 + 0.3 * (bt - 9)) * luckMul();
 }
 // Шансы найти секретные буры за 1 секунду
 function drillChance(i) {
   const d = DRILLS[i], bt = bestTier(); if (bt < d.need) return 0;
-  const base = d.name === 'Кенриум' ? 1 / 90000 : 1 / 15000;
-  return base * (1 + 0.4 * (bt - d.need)) * luckMul();
+  const base = d.rate;
+  return base * (1 + 0.15 * (bt - d.need)) * luckMul();
 }
 function tryFinds(seconds) {
   SECRET_DRILLS.forEach(i => {
     if (S.drills[i] >= 0) return;
     if (Math.random() < 1 - Math.pow(1 - drillChance(i), seconds)) {
       S.drills[i] = 0; save(true); build(); hapticOk();
-      const top = i === SECRET_DRILLS[SECRET_DRILLS.length - 1];
+      const top = !!DRILLS[i].top;
       showModal(`<div class="mega-reveal secret-drill" style="padding:10px">${drillSvg(DRILLS[i].color, 120)}</div>
         <h3 class="mega-text">${top ? 'САМЫЙ РЕДКИЙ БУР!' : 'СЕКРЕТНЫЙ БУР!'}</h3>
         <p style="font-size:22px;font-weight:800;margin:6px 0">${DRILLS[i].name}</p><p class="muted">${DRILLS[i].text}</p>`, 'Забрать бур');
@@ -328,15 +408,22 @@ function tryFinds(seconds) {
   });
   tryItumka(seconds);
 }
+// Мартовские питомцы не продаются: их можно только случайно найти в шахте
+function petFindChance(i) {
+  const p = PETS[i], bt = bestTier();
+  if (bt < p.need) return 0;
+  return p.rate * (1 + 0.15 * (bt - p.need)) * luckMul();
+}
 function tryItumka(seconds) {
-  if (S.pets[ITUMKA] > 0) return;
-  const p = 1 - Math.pow(1 - itumkaChance(), seconds);
-  if (Math.random() < p) {
-    S.pets[ITUMKA] = 1; save(true); build(); hapticOk();
-    showModal(`<div class="mega-reveal">${petIconBig(ITUMKA)}</div><h3 class="mega-text">МЕГА-РЕДКИЙ ПИТОМЕЦ!</h3>
-      <p style="font-size:22px;font-weight:800;margin:6px 0">Лорсик</p>
-      <p class="muted">Бенгальский кот из самой глубины шахты. Ускоряет всё сразу!</p>`, 'Забрать Лорсика');
-  }
+  PETS.forEach((p, i) => {
+    if (!p.hidden || p.removed || S.pets[i] > 0) return;
+    if (Math.random() < 1 - Math.pow(1 - petFindChance(i), seconds)) {
+      S.pets[i] = 1; save(true); build(); hapticOk();
+      showModal(`<div class="mega-reveal">${petIconBig(i)}</div><h3 class="mega-text">МАРТОВСКИЙ ПИТОМЕЦ!</h3>
+        <p style="font-size:22px;font-weight:800;margin:6px 0">${p.name}</p>
+        <p class="muted">${p.text || 'Самая редкая находка в шахте!'}</p>`, 'Забрать');
+    }
+  });
 }
 const BOOST_TXT = { luck: 'удача', money: 'монеты', speed: 'скорость', tap: 'сила тапа', vip: 'шанс VIP/Ультра' };
 
@@ -378,7 +465,7 @@ function defaults() {
   return {
     coins: 0, items: Array(ASTRALS.length).fill(0), found: Array(ASTRALS.length).fill(0),
     drills: DRILLS.map((_, i) => i === 0 ? 0 : -1), pets: PETS.map(() => 0),
-    luck: 0, tap: 0, progress: 0, total: 0, earned: 0, t: Date.now()
+    dv: 2, luck: 0, tap: 0, astral: 0, progress: 0, total: 0, earned: 0, t: Date.now()
   };
 }
 let S = defaults();
@@ -392,10 +479,10 @@ const fmt = n => {
 };
 const pct = v => v >= 0.1 ? (v * 100).toFixed(1) + '%' : v >= 0.001 ? (v * 100).toFixed(2) + '%' : (v * 100).toFixed(3) + '%';
 const petBoost = kind => 1 + PETS.reduce((s, p, i) => s + (p.removed ? 0 : S.pets[i] * (p.b[kind] || 0)), 0) / 100;
-const speedMul = () => petBoost('speed');
-const moneyMul = () => petBoost('money');
-const luckMul  = () => petBoost('luck') + S.luck * 0.05 + secretBonus('luck');
-const vipMul   = () => petBoost('vip') + secretBonus('vip');
+const speedMul = () => petBoost('speed') + secretBonus('speed');
+const moneyMul = () => petBoost('money') + secretBonus('money');
+const luckMul  = () => petBoost('luck') + S.luck * 0.05 + S.astral * ASTRAL_LUCK;
+const vipMul   = () => petBoost('vip');
 const tapMul   = () => petBoost('tap');
 
 const drillPower = i => S.drills[i] < 0 ? 0 : DRILLS[i].power * (1 + 0.5 * S.drills[i]);
@@ -429,18 +516,19 @@ const fmtD = n => n < 10 ? (Math.round(n * 10) / 10).toString() : fmt(n);
 // Предпросмотр: что будет после улучшения
 const drillRateAt = (i, l) => DRILLS[i].power * (1 + 0.5 * l) * speedMul() / STEP;
 const tapAt  = t => ((1 + t) * 5 + totalPower() * 0.3) * tapMul() / STEP;
-const luckAt = L => luckMul() - S.luck * 0.05 + L * 0.05;
+const astralLuckAt = l => luckMul() - S.astral * ASTRAL_LUCK + l * ASTRAL_LUCK;
 const sellPrice = i => Math.floor(TIERS[ASTRALS[i].t].price * moneyMul());
 
 // Шансы по редкостям: чем лучше бур — тем больше шанс на редкие
 function tierProbs() {
   const bt = bestTier(), L = luckMul();
   const w = [1, 0, 0, 0];
-  if (bt >= 1) w[1] = 0.08 * (1 + 0.35 * (bt - 1)) * L;
-  if (bt >= 3) w[2] = 0.012 * (1 + 0.45 * (bt - 3)) * L;
-  if (bt >= 5) w[3] = 0.0025 * (1 + 0.6 * (bt - 5)) * L;
-  const vip = bt >= 4 ? Math.min(0.01, 0.00006 * Math.pow(2.2, bt - 4) * L * vipMul()) : 0;
-  const ultra = bt >= 5 ? Math.min(0.002, 0.000008 * Math.pow(2.5, bt - 5) * L * vipMul()) : 0;
+  if (bt >= 1) w[1] = 0.08 * (1 + 0.2 * (bt - 1)) * L;   // редкие — с Каменного
+  if (bt >= 4) w[2] = 0.012 * (1 + 0.25 * (bt - 4)) * L; // эпические — с Железного
+  if (bt >= 9) w[3] = 0.0025 * (1 + 0.35 * (bt - 9)) * L; // легендарные — с Алмазного
+  const vip = bt >= 7 ? Math.min(0.01, 0.00006 * Math.pow(1.6, bt - 7) * L * vipMul()) : 0; // Сырный — с Золотого
+  // Мартовский астрал: самый редкий в игре (с Плазменного бура, максимум 0.03%)
+  const ultra = bt >= 10 ? Math.min(0.0003, 0.0000015 * Math.pow(1.9, bt - 10) * L * vipMul()) : 0;
   const sum = w.reduce((a, b) => a + b, 0);
   return [...w.map(x => (1 - vip - ultra) * x / sum), vip, ultra];
 }
@@ -473,7 +561,7 @@ function mine(n) {
   } else if (best >= 0 && ASTRALS[best].t === 4) {
     hapticOk();
     showModal(`<div class="r4">${crystal(best, 120)}</div><h3 style="color:#ff4fa3">VIP-астрал!</h3><p>${ASTRALS[best].n}</p><p class="muted" style="margin-top:6px">Шанс выпадения меньше 1%</p>`, 'Круто!');
-  } else if (best >= 0 && ASTRALS[best].t >= (bestTier() >= 4 ? 3 : 2) && Date.now() - lastRareToast > 2500) {
+  } else if (best >= 0 && ASTRALS[best].t >= (bestTier() >= 7 ? 3 : 2) && Date.now() - lastRareToast > 2500) {
     lastRareToast = Date.now();
     haptic('heavy');
     showToast(`${crystal(best, 30)} ${ASTRALS[best].n}!`);
@@ -604,9 +692,20 @@ rock.addEventListener('pointerdown', e => {
     area.appendChild(f); setTimeout(() => f.remove(), 1000);
   }
 });
-[[24,36,3],[124,54,10],[66,116,19],[146,124,26],[90,22,12]].forEach(([l, t, i]) => {
-  rock.insertAdjacentHTML('beforeend', `<div style="position:absolute;left:${l}px;top:${t}px;opacity:.85">${crystal(i, 26)}</div>`);
-});
+function renderAstral(anim) {
+  rock.innerHTML = crystal(ASTRAL_LEVELS[S.astral], 170);
+  if (anim) { rock.classList.remove('levelup'); void rock.offsetWidth; rock.classList.add('levelup'); }
+}
+function upAstral() {
+  if (S.astral >= ASTRAL_MAX) return;
+  const c = astralCostAt(S.astral);
+  if (S.coins < c) return;
+  S.coins -= c; S.astral++;
+  hapticOk(); renderAstral(true);
+  const m = ASTRAL_LEVELS[S.astral];
+  showToast(`${crystal(m, 30)} Новый астрал: ${ASTRALS[m].n}!`);
+  save(); update();
+}
 
 // ================= Отрисовка =================
 const $ = id => document.getElementById(id);
@@ -633,15 +732,13 @@ function build() {
       <button class="btn" id="db-${i}" onclick="drillAction(${i})"></button></div>`; }).join('')
     + `<h2 style="margin-top:16px">Секретные буры</h2><p class="muted" style="margin-bottom:12px">Их нельзя купить. Они случайно находятся в шахте, пока работают буры.</p>`
     + SECRET_DRILLS.map(i => { const d = DRILLS[i], own = S.drills[i] >= 0; return own ? `
-    <div class="card ${i === SECRET_DRILLS[SECRET_DRILLS.length - 1] ? 'pet-mega' : 'pet-legend'}" id="dc-${i}"><div class="ico secret-drill">${drillSvg(d.color)}</div>
-      <div class="info"><b>${d.name} <span class="${i === SECRET_DRILLS[SECRET_DRILLS.length - 1] ? 'tag-mega' : 'tag-legend'}">СЕКРЕТНЫЙ</span></b><small id="di-${i}"></small></div>
+    <div class="card ${d.top ? 'pet-mega' : 'pet-legend'}" id="dc-${i}"><div class="ico secret-drill">${drillSvg(d.color)}</div>
+      <div class="info"><b>${d.name} <span class="${d.top ? 'tag-mega' : 'tag-legend'}">${d.top ? 'САМЫЙ РЕДКИЙ' : 'СЕКРЕТНЫЙ'}</span></b><small id="di-${i}"></small></div>
       <button class="btn" id="db-${i}" onclick="drillAction(${i})"></button></div>` : `
     <div class="card pet-secret" id="dc-${i}"><div class="ico" style="font-size:28px">❓</div>
       <div class="info"><b>????? <span class="tag-mega">???</span></b><small id="di-${i}"></small></div>
       <button class="btn" id="db-${i}" disabled>???</button></div>`; }).join('');
   $('upgradeList').innerHTML = `
-    <div class="card"><div class="ico">🍀</div><div class="info"><b>Удача <span id="ulL"></span></b><small id="uiL"></small></div>
-      <button class="btn" id="ubL" onclick="buyLuck()"></button></div>
     <div class="card"><div class="ico">💪</div><div class="info"><b>Сила удара <span id="ulT"></span></b><small id="uiT"></small></div>
       <button class="btn" id="ubT" onclick="buyTap()"></button></div>`;
   $('petList').innerHTML = PET_ORDER.map(i => { const p = PETS[i];
@@ -650,10 +747,11 @@ function build() {
       <div class="info"><b>????? <span class="tag-mega">???</span></b><small id="pi-${i}"></small></div>
       <button class="btn" id="pb-${i}" disabled>???</button></div>`;
     return `
-    <div class="card ${p.rare ? 'pet-' + p.rare : ''}" id="pc-${i}"><div class="ico pet-ico">${petIcon(i)}<i id="pl-${i}"></i></div>
-      <div class="info"><b>${p.name}${p.rare === 'mega' ? ' <span class="tag-mega">МЕГА-РЕДКИЙ</span>' : p.rare === 'legend' ? ' <span class="tag-legend">ЛЕГЕНДАРНЫЙ</span>' : p.rare === 'epic' ? ' <span class="tag-epic">ЭПИЧЕСКИЙ</span>' : p.rare === 'rare' ? ' <span class="tag-rare">РЕДКИЙ</span>' : ''}</b><small id="pi-${i}"></small></div>
+    <div class="card ${PET_RARITY[p.rare] ? PET_RARITY[p.rare].card : ''}" id="pc-${i}"><div class="ico pet-ico">${petIcon(i)}<i id="pl-${i}"></i></div>
+      <div class="info"><b>${p.name}${PET_RARITY[p.rare] ? ` <span class="${PET_RARITY[p.rare].tag}">${PET_RARITY[p.rare].name}</span>` : ''}</b><small id="pi-${i}"></small></div>
       <button class="btn" id="pb-${i}" onclick="buyPet(${i})"></button></div>`; }).join('');
-  $('vipBadge').innerHTML = crystal(33, 26) + '<span id="vipCount">0</span>';
+  renderAstral();
+  $('vipBadge').innerHTML = crystal(ULTRA_I, 26) + '<span id="vipCount">0</span>';
   renderDrillAnim();
 }
 
@@ -665,10 +763,23 @@ document.querySelectorAll('.buybar button').forEach(b => b.addEventListener('cli
 }));
 function update() {
   $('coins').textContent = fmt(S.coins);
-  $('vipCount').textContent = fmt(S.items[32] + S.items[33]);
+  $('vipCount').textContent = fmt(S.items[VIP_I] + S.items[ULTRA_I]);
   if (tab === 'mine') {
     $('perSec').textContent = fmtD(totalPower() / STEP);
     $('tapStat').textContent = fmtD(tapPower() / STEP);
+    { const cur = ASTRAL_LEVELS[S.astral], tr = TIERS[ASTRALS[cur].t];
+      $('auName').innerHTML = `Астрал · ур. ${S.astral + 1}/${ASTRAL_MAX + 1} · <span style="color:${tr.color}">${ASTRALS[cur].n}</span>`;
+      if (S.astral >= ASTRAL_MAX) {
+        $('auNext').innerHTML = crystal(cur, 40);
+        $('auInfo').textContent = `Удача ×${luckMul().toFixed(2)} · максимальный уровень!`;
+        $('auBtn').textContent = 'МАКС'; $('auBtn').disabled = true;
+      } else {
+        const nx = ASTRAL_LEVELS[S.astral + 1], c = astralCostAt(S.astral);
+        if ($('auNext').dataset.m != nx) { $('auNext').innerHTML = crystal(nx, 40); $('auNext').dataset.m = nx; }
+        $('auInfo').innerHTML = `Удача ×${luckMul().toFixed(2)} <span class="arrow">→ ×${astralLuckAt(S.astral + 1).toFixed(2)}</span> · дальше: ${ASTRALS[nx].n}`;
+        $('auBtn').textContent = '⬆ ' + fmt(c); $('auBtn').disabled = S.coins < c;
+      }
+    }
     $('collStat').textContent = S.found.reduce((a, b) => a + b, 0) + '/' + ASTRALS.length;
     const p = tierProbs();
     $('chances').innerHTML = TIERS.map((tr, t) => `<div class="chance-row"><span class="dot" style="background:${tr.color}"></span><span>${tr.name}</span><span>${p[t] > 0 ? pct(p[t]) : '🔒 нужен бур получше'}</span></div>`).join('');
@@ -686,10 +797,11 @@ function update() {
       const lvl = S.drills[i], btn = $('db-' + i), locked = lvl < 0 && i > bt + 1;
       if (d.secret) {
         if (lvl < 0) { $('di-' + i).textContent = bt >= d.need ? 'Секретный бур. Может найтись в глубине шахты…' : `Секретный бур. Нужен ${DRILLS[d.need].name} или круче…`; return; }
-        const extra = [`+${Math.round(d.luck * 100)}% удача`, d.vip ? `+${Math.round(d.vip * 100)}% VIP/Ультра` : ''].filter(Boolean).join(', ');
+        const bx = (l) => [d.speed ? `+${Math.round(secretBonusAt(i, l)('speed') * 100)}% скорость` : '', d.money ? `+${Math.round(secretBonusAt(i, l)('money') * 100)}% монеты` : ''].filter(Boolean).join(', ');
+        const extra = bx(lvl);
         if (lvl >= MAX_LVL) { $('di-' + i).textContent = `Ур. ${lvl + 1} (макс) · ${fmtD(drillRateAt(i, lvl))} астр./с · ${extra}`; btn.textContent = 'МАКС'; btn.disabled = true; }
         else { const b = bulk(l => upgradeCostAt(i, l), lvl, MAX_LVL);
-          $('di-' + i).innerHTML = `Ур. ${lvl + 1} <span class="arrow">→ ${b.to + 1}</span> · ${fmtD(drillRateAt(i, lvl))} <span class="arrow">→ ${fmtD(drillRateAt(i, b.to))}</span> астр./с · ${extra}`;
+          $('di-' + i).innerHTML = `Ур. ${lvl + 1} <span class="arrow">→ ${b.to + 1}</span> · ${fmtD(drillRateAt(i, lvl))} <span class="arrow">→ ${fmtD(drillRateAt(i, b.to))}</span> астр./с · ${extra} <span class="arrow">→ ${bx(b.to)}</span>`;
           btn.textContent = btnText(b); btn.disabled = S.coins < b.cost; }
         return;
       }
@@ -705,10 +817,7 @@ function update() {
         btn.disabled = locked || S.coins < d.cost;
       }
     });
-    const bL = bulk(luckCostAt, S.luck, 1000), bT = bulk(tapCostAt, S.tap, 1000);
-    $('ulL').innerHTML = `· ур. ${S.luck} <span class="arrow">→ ${bL.to}</span>`;
-    $('uiL').innerHTML = `Удача ×${luckMul().toFixed(2)} <span class="arrow">→ ×${luckAt(bL.to).toFixed(2)}</span>`;
-    $('ubL').textContent = btnText(bL); $('ubL').disabled = S.coins < bL.cost;
+    const bT = bulk(tapCostAt, S.tap, 1000);
     $('ulT').innerHTML = `· ур. ${S.tap} <span class="arrow">→ ${bT.to}</span>`;
     $('uiT').innerHTML = `${fmtD(tapPower() / STEP)} <span class="arrow">→ ${fmtD(tapAt(bT.to))}</span> астр. за тап`;
     $('ubT').textContent = btnText(bT); $('ubT').disabled = S.coins < bT.cost;
@@ -719,7 +828,7 @@ function update() {
       const lvl = S.pets[i], btn = $('pb-' + i);
       if (p.hidden && !lvl) {
         $('pl-' + i).style.display = 'none';
-        $('pi-' + i).textContent = bestTier() >= 5 ? 'Скрытый питомец. Говорят, он прячется где-то в глубине шахты…' : 'Скрытый питомец. Чтобы его найти, нужен бур помощнее…';
+        $('pi-' + i).textContent = bestTier() >= p.need ? 'Мартовский питомец. Говорят, он прячется где-то в глубине шахты…' : `Мартовский питомец. Чтобы его найти, нужен ${DRILLS[p.need].name} или круче…`;
         return;
       }
       const b = bulk(l => petCostAt(i, l), lvl, PET_MAX);
@@ -769,7 +878,7 @@ async function submitScore() {
   try {
     await fetch(`${SUPABASE_URL}/rest/v1/leaderboard`, {
       method: 'POST', headers: lbHeaders({ Prefer: 'resolution=merge-duplicates' }),
-      body: JSON.stringify({ id: p.id, name: p.name.slice(0, 40), score: Math.floor(S.earned), vip: S.items[32] + S.items[33], updated_at: new Date().toISOString() })
+      body: JSON.stringify({ id: p.id, name: p.name.slice(0, 40), score: Math.floor(S.earned), vip: S.items[VIP_I] + S.items[ULTRA_I], updated_at: new Date().toISOString() })
     });
   } catch (e) {}
 }
@@ -813,6 +922,12 @@ function save(cloud) {
 }
 function merge(o) {
   const d = defaults(); if (!o) return d;
+  if (o.drills && o.drills.length === OLD_DRILL_MAP.length && !o.dv) {
+    const nd = DRILLS.map((_, i) => i === 0 ? 0 : -1);
+    o.drills.forEach((l, i) => { nd[OLD_DRILL_MAP[i]] = l; });
+    o.drills = nd;
+  }
+  o.dv = 2;
   const r = Object.assign(d, o);
   ['items', 'found', 'drills', 'pets'].forEach(k => {
     r[k] = defaults()[k].map((v, i) => (o[k] && o[k][i] !== undefined) ? o[k][i] : v);
