@@ -451,6 +451,35 @@ function showMaintenance() {
     </div>`;
 }
 
+// ================= Панель теста (только для админов) =================
+function openAdmin() {
+  showModal(`<h3>🛠 Панель теста</h3><p class="muted" style="margin:6px 0 12px">Видишь только ты. Пока включён тест, твои результаты не идут в топ.</p>
+    <button class="btn wide" onclick="adminUnlock()">🔓 Открыть всё</button>
+    <button class="btn wide" onclick="adminCoins()">🪙 +1B монет</button>
+    <button class="btn wide pink" onclick="adminReset()">♻️ Сбросить всё (вернуть как новый)</button>`, 'Закрыть');
+}
+function adminUnlock() {
+  S.tester = true;
+  S.found = S.found.map(() => 1);
+  S.items = S.items.map(v => Math.max(v, 1));
+  S.drills = S.drills.map(l => Math.max(l, 0));
+  S.pets = S.pets.map((l, i) => PETS[i].removed ? l : Math.max(l, 1));
+  invDirty = true; build(); renderDrillAnim(); save(true); update();
+  document.getElementById('modal').classList.remove('show');
+  showToast('🔓 Всё открыто для теста');
+}
+function adminCoins() {
+  S.tester = true; S.coins += 1e9; save(true); update();
+  showToast('🪙 +1B монет');
+}
+function adminReset() {
+  const keepT = Date.now();
+  S = defaults(); S.t = keepT;
+  invDirty = true; build(); renderDrillAnim(); renderAstral(); save(true); update();
+  document.getElementById('modal').classList.remove('show');
+  showToast('♻️ Прогресс сброшен');
+}
+
 // ================= Таблица лидеров (Supabase) =================
 // Вставь сюда данные своего проекта Supabase (инструкция в чате). Пока пусто — вкладка «Топ» покажет подсказку.
 const SUPABASE_URL = 'https://duhqoowplsvixatbvzpd.supabase.co';   // например 'https://abcdxyz.supabase.co'
@@ -874,7 +903,7 @@ function playerInfo() {
   return null; // вне Telegram в топ не отправляем
 }
 async function submitScore() {
-  const p = playerInfo(); if (!lbOn() || !p) return;
+  const p = playerInfo(); if (!lbOn() || !p || S.tester) return; // тестовый прогресс в топ не идёт
   try {
     await fetch(`${SUPABASE_URL}/rest/v1/leaderboard`, {
       method: 'POST', headers: lbHeaders({ Prefer: 'resolution=merge-duplicates' }),
@@ -963,6 +992,13 @@ async function init() {
   const user = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
   if (user) $('hello').textContent = 'Шахтёр ' + user.first_name;
   if (MAINTENANCE) $('hello').textContent += ' · 🛠 техработы (видишь только ты)';
+  if (isAdmin()) {
+    const b = document.createElement('button');
+    b.textContent = '🛠 Тест'; b.className = 'btn ghost';
+    b.style.cssText = 'min-width:0;padding:6px 10px;font-size:12px;margin-right:8px';
+    b.onclick = openAdmin;
+    document.querySelector('header').insertBefore(b, $('vipBadge'));
+  }
   await new Promise(r => checkImages(r));
   build();
 
