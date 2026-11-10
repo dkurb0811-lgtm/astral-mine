@@ -62,6 +62,11 @@
   .card { display: flex; align-items: center; gap: 12px; padding: 12px; margin-bottom: 10px;
     background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.07); border-radius: 16px; }
   .card.locked { opacity: .45; }
+  .buybar { display: flex; gap: 6px; margin-bottom: 12px; position: sticky; top: -14px; z-index: 4; padding: 6px 0; background: #150f2a; }
+  .buybar button { flex: 1; padding: 9px 0; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05);
+    color: #eee8ff; font-weight: 800; font-size: 13px; cursor: pointer; }
+  .buybar button.on { background: linear-gradient(135deg, #ffd75e, #ffb02e); color: #1a1030; border-color: transparent; }
+  .arrow { color: #2ee08a; font-weight: 700; }
   .card .ico { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; position: relative;
     background: rgba(0,0,0,.25); border-radius: 14px; flex-shrink: 0; font-size: 30px; }
   .pet-ico { border: 2px solid #e8b33a; border-radius: 50% !important; box-shadow: 0 0 10px rgba(232,179,58,.4); }
@@ -153,6 +158,7 @@
     <section id="tab-drills">
       <h2>Буры</h2>
       <p class="muted" style="margin-bottom:12px">Чем круче бур, тем быстрее он копает и тем более редкие астралы ему доступны. Сырный (VIP) выпадает с Золотого бура, Мартовский (ультра) — с Алмазного.</p>
+<div class="buybar"><button data-buy="1" class="on">x1</button><button data-buy="10">x10</button><button data-buy="max">MAX</button></div>
       <div id="drillList"></div>
       <h2 style="margin-top:16px">Улучшения</h2>
       <div id="upgradeList"></div>
@@ -161,6 +167,7 @@
     <section id="tab-pets">
       <h2>Питомцы</h2>
       <p class="muted" style="margin-bottom:12px">Питомцы дают бусты: копают быстрее, приносят больше монет или повышают удачу. Каждый уровень усиливает буст.</p>
+<div class="buybar"><button data-buy="1" class="on">x1</button><button data-buy="10">x10</button><button data-buy="max">MAX</button></div>
       <div id="petList"></div>
     </section>
 
@@ -204,12 +211,12 @@ const hasCloud = () => !!(tg && tg.CloudStorage && tg.isVersionAtLeast && tg.isV
 
 // ================= Редкости =================
 const TIERS = [
-  { name: 'Обычные',     color: '#a9b1bd', price: 5 },
-  { name: 'Редкие',      color: '#4da3ff', price: 40 },
-  { name: 'Эпические',   color: '#b46bff', price: 300 },
-  { name: 'Легендарные', color: '#ffb02e', price: 2500 },
-  { name: 'VIP',         color: '#ff4fa3', price: 50000 },
-  { name: 'Ультра',      color: '#ff3b3b', price: 500000 },
+  { name: 'Обычные',     color: '#a9b1bd', price: 2 },
+  { name: 'Редкие',      color: '#4da3ff', price: 15 },
+  { name: 'Эпические',   color: '#b46bff', price: 120 },
+  { name: 'Легендарные', color: '#ffb02e', price: 1000 },
+  { name: 'VIP',         color: '#ff4fa3', price: 20000 },
+  { name: 'Ультра',      color: '#ff3b3b', price: 200000 },
 ];
 const TIER_ONE = ['Обычный', 'Редкий', 'Эпический', 'Легендарный', 'VIP', 'УЛЬТРА-РЕДКИЙ'];
 
@@ -266,13 +273,13 @@ const BY_TIER = TIERS.map((_, t) => ASTRALS.map((a, i) => a.t === t ? i : -1).fi
 // ================= Буры =================
 const DRILLS = [
   { name: 'Ручной бур',     power: 1,    cost: 0,         color: '#9aa0a6' },
-  { name: 'Медный бур',     power: 4,    cost: 150,       color: '#d9824a' },
-  { name: 'Железный бур',   power: 12,   cost: 1500,      color: '#c9ced6' },
-  { name: 'Стальной бур',   power: 35,   cost: 12000,     color: '#7b8794' },
-  { name: 'Золотой бур',    power: 100,  cost: 90000,     color: '#f5c542' },
-  { name: 'Алмазный бур',   power: 300,  cost: 750000,    color: '#5ee7ff' },
-  { name: 'Плазменный бур', power: 900,  cost: 6000000,   color: '#ff5ce1' },
-  { name: 'Астральный бур', power: 3000, cost: 45000000,  color: '#b46bff' },
+  { name: 'Медный бур',     power: 4,    cost: 300,       color: '#d9824a' },
+  { name: 'Железный бур',   power: 12,   cost: 4000,      color: '#c9ced6' },
+  { name: 'Стальной бур',   power: 35,   cost: 40000,     color: '#7b8794' },
+  { name: 'Золотой бур',    power: 100,  cost: 350000,     color: '#f5c542' },
+  { name: 'Алмазный бур',   power: 300,  cost: 3000000,    color: '#5ee7ff' },
+  { name: 'Плазменный бур', power: 900,  cost: 30000000,   color: '#ff5ce1' },
+  { name: 'Астральный бур', power: 3000, cost: 250000000,  color: '#b46bff' },
   // Секретные буры: не продаются, случайно находятся в шахте. luck/vip — дополнительные бонусы
   { name: 'Флоурит', power: 6000,  cost: 60000000,  color: '#3affd0', secret: true, luck: 0.5, vip: 0, need: 3, text: 'Бур из глубин, названный в честь Флоу' },
   { name: 'Кенриум', power: 25000, cost: 400000000, color: '#ff3b3b', secret: true, luck: 1.5, vip: 0.75, need: 6, text: 'Самый редкий бур в игре, назван в честь Кенри' },
@@ -333,13 +340,39 @@ function tryItumka(seconds) {
 }
 const BOOST_TXT = { luck: 'удача', money: 'монеты', speed: 'скорость', tap: 'сила тапа', vip: 'шанс VIP/Ультра' };
 
+// ================= Режим техработ =================
+// true  — игроки видят экран «Технические работы», в игру попадают только админы
+// false — игра открыта для всех
+const MAINTENANCE = true;
+// Кто может заходить во время техработ (ник Telegram без @ или имя, маленькими буквами)
+const ADMINS = ['itumka95', '@itumka95'];
+function isAdmin() {
+  const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+  if (!u) return false;
+  const names = [u.username, u.first_name, (u.first_name || '') + ' ' + (u.last_name || '')].filter(Boolean).map(x => String(x).trim().toLowerCase());
+  return names.some(n => ADMINS.includes(n)) || ADMINS.includes(String(u.id));
+}
+function showMaintenance() {
+  const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+  document.getElementById('app').innerHTML = `
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px">
+      <div style="font-size:84px;animation:bob .9s infinite ease-in-out;position:relative;left:0;transform:none">⛏️</div>
+      <h2 style="font-size:24px;margin:18px 0 8px">Шахта на техобслуживании</h2>
+      <p class="muted" style="font-size:15px;line-height:1.5;max-width:300px">Добавляем новые астралы, питомцев и бусты.<br>Скоро вернёмся!</p>
+      <div style="margin-top:22px;background:rgba(46,224,138,.12);border:1px solid rgba(46,224,138,.4);border-radius:14px;padding:12px 16px;font-weight:700">✅ Твой прогресс сохранён</div>
+      ${u ? `<p class="muted" style="margin-top:30px;font-size:11px;opacity:.6">ID: ${u.id}</p>` : ''}
+    </div>`;
+}
+
 // ================= Таблица лидеров (Supabase) =================
 // Вставь сюда данные своего проекта Supabase (инструкция в чате). Пока пусто — вкладка «Топ» покажет подсказку.
 const SUPABASE_URL = 'https://duhqoowplsvixatbvzpd.supabase.co';   // например 'https://abcdxyz.supabase.co'
 const SUPABASE_KEY = 'sb_publishable_q-fB_8o6hPbL05WKqHtqpA_en1vhE8f';   // ключ anon / publishable
 const PET_MAX = 20;
 
-const STEP = 5, MAX_LVL = 25, KEY = 'astral_mine_v3';
+// СЕЗОН: поменяй число на следующее (2, 3, ...), и прогресс у ВСЕХ игроков обнулится
+const SEASON = 1;
+const STEP = 5, MAX_LVL = 40, KEY = 'astral_mine_season_' + SEASON;
 
 function defaults() {
   return {
@@ -369,10 +402,34 @@ const drillPower = i => S.drills[i] < 0 ? 0 : DRILLS[i].power * (1 + 0.5 * S.dri
 const totalPower = () => DRILLS.reduce((s, _, i) => s + drillPower(i), 0) * speedMul();
 const bestTier = () => { let b = 0; REG_DRILLS.forEach(i => { if (S.drills[i] >= 0) b = i; }); return b; };
 const tapPower = () => ((1 + S.tap) * 5 + totalPower() * 0.3) * tapMul();
-const upgradeCost = i => Math.ceil(Math.max(20, DRILLS[i].cost * 0.5) * Math.pow(1.6, S.drills[i]));
-const luckCost = () => Math.ceil(300 * Math.pow(2.1, S.luck));
-const tapCost  = () => Math.ceil(60 * Math.pow(1.85, S.tap));
-const petCost  = i => Math.ceil(PETS[i].cost * Math.pow(1.8, S.pets[i]));
+const upgradeCost = i => upgradeCostAt(i, S.drills[i]);
+const luckCost = () => luckCostAt(S.luck);
+const tapCost  = () => tapCostAt(S.tap);
+const petCost  = i => petCostAt(i, S.pets[i]);
+const upgradeCostAt = (i, l) => Math.ceil(Math.max(30, DRILLS[i].cost * 0.6) * Math.pow(1.65, l));
+const luckCostAt = l => Math.ceil(500 * Math.pow(2.25, l));
+const tapCostAt  = l => Math.ceil(100 * Math.pow(1.95, l));
+const petCostAt  = (i, l) => Math.ceil(PETS[i].cost * Math.pow(1.9, l));
+// Режим покупки: 1, 10 или 'max'
+let BUY = 1;
+function bulk(costAt, cur, max) {
+  let n = 0, cost = 0, l = cur;
+  const target = BUY === 'max' ? Infinity : BUY;
+  while (n < target && l < max) {
+    const c = costAt(l);
+    if (BUY === 'max' && n > 0 && cost + c > S.coins) break;
+    cost += c; l++; n++;
+    if (BUY === 'max' && cost > S.coins) break;
+  }
+  return { n, cost, to: cur + n };
+}
+const btnText = (b, first) => (first ? 'Взять' : '⬆') + (b.n > 1 ? ` x${b.n}` : '') + ' · ' + fmt(b.cost);
+// Короткие числа с десятыми для маленьких значений
+const fmtD = n => n < 10 ? (Math.round(n * 10) / 10).toString() : fmt(n);
+// Предпросмотр: что будет после улучшения
+const drillRateAt = (i, l) => DRILLS[i].power * (1 + 0.5 * l) * speedMul() / STEP;
+const tapAt  = t => ((1 + t) * 5 + totalPower() * 0.3) * tapMul() / STEP;
+const luckAt = L => luckMul() - S.luck * 0.05 + L * 0.05;
 const sellPrice = i => Math.floor(TIERS[ASTRALS[i].t].price * moneyMul());
 
 // Шансы по редкостям: чем лучше бур — тем больше шанс на редкие
@@ -487,20 +544,21 @@ function drillAction(i) {
     S.coins -= DRILLS[i].cost; S.drills[i] = 0; haptic('medium');
     showToast(`🔩 ${DRILLS[i].name} куплен!`);
   } else {
-    const c = upgradeCost(i);
-    if (lvl >= MAX_LVL || S.coins < c) return;
-    S.coins -= c; S.drills[i]++; haptic();
+    const b = bulk(l => upgradeCostAt(i, l), lvl, MAX_LVL);
+    if (!b.n || S.coins < b.cost) return;
+    S.coins -= b.cost; S.drills[i] = b.to; haptic();
   }
   renderDrillAnim(); save();
 }
-function buyLuck() { const c = luckCost(); if (S.coins < c) return; S.coins -= c; S.luck++; haptic(); save(); }
-function buyTap()  { const c = tapCost();  if (S.coins < c) return; S.coins -= c; S.tap++;  haptic(); save(); }
+function buyLuck() { const b = bulk(luckCostAt, S.luck, 1000); if (!b.n || S.coins < b.cost) return; S.coins -= b.cost; S.luck = b.to; haptic(); save(); }
+function buyTap()  { const b = bulk(tapCostAt, S.tap, 1000);   if (!b.n || S.coins < b.cost) return; S.coins -= b.cost; S.tap = b.to;  haptic(); save(); }
 function buyPet(i) {
   if (PETS[i].hidden && !S.pets[i]) return;
-  const c = petCost(i);
-  if (S.pets[i] >= PET_MAX || S.coins < c) return;
-  S.coins -= c; S.pets[i]++; haptic('medium');
-  if (S.pets[i] === 1) showToast(`${PETS[i].emoji} ${PETS[i].name} с тобой!`);
+  const was = S.pets[i];
+  const b = bulk(l => petCostAt(i, l), was, PET_MAX);
+  if (!b.n || S.coins < b.cost) return;
+  S.coins -= b.cost; S.pets[i] = b.to; haptic('medium');
+  if (was === 0) showToast(`${PETS[i].emoji} ${PETS[i].name} с тобой!`);
   save();
 }
 function sell(i, all) {
@@ -582,9 +640,9 @@ function build() {
       <div class="info"><b>????? <span class="tag-mega">???</span></b><small id="di-${i}"></small></div>
       <button class="btn" id="db-${i}" disabled>???</button></div>`; }).join('');
   $('upgradeList').innerHTML = `
-    <div class="card"><div class="ico">🍀</div><div class="info"><b>Удача <span id="ulL"></span></b><small>+5% к шансу редких астралов</small></div>
+    <div class="card"><div class="ico">🍀</div><div class="info"><b>Удача <span id="ulL"></span></b><small id="uiL"></small></div>
       <button class="btn" id="ubL" onclick="buyLuck()"></button></div>
-    <div class="card"><div class="ico">💪</div><div class="info"><b>Сила удара <span id="ulT"></span></b><small>Больше астралов за тап</small></div>
+    <div class="card"><div class="ico">💪</div><div class="info"><b>Сила удара <span id="ulT"></span></b><small id="uiT"></small></div>
       <button class="btn" id="ubT" onclick="buyTap()"></button></div>`;
   $('petList').innerHTML = PET_ORDER.map(i => { const p = PETS[i];
     const secret = p.hidden && !S.pets[i];
@@ -600,12 +658,17 @@ function build() {
 }
 
 let tab = 'mine';
+document.querySelectorAll('.buybar button').forEach(b => b.addEventListener('click', () => {
+  BUY = b.dataset.buy === 'max' ? 'max' : +b.dataset.buy;
+  document.querySelectorAll('.buybar button').forEach(x => x.classList.toggle('on', x.dataset.buy === b.dataset.buy));
+  haptic('soft'); update();
+}));
 function update() {
   $('coins').textContent = fmt(S.coins);
   $('vipCount').textContent = fmt(S.items[32] + S.items[33]);
   if (tab === 'mine') {
-    $('perSec').textContent = (totalPower() / STEP).toFixed(1);
-    $('tapStat').textContent = (tapPower() / STEP).toFixed(1);
+    $('perSec').textContent = fmtD(totalPower() / STEP);
+    $('tapStat').textContent = fmtD(tapPower() / STEP);
     $('collStat').textContent = S.found.reduce((a, b) => a + b, 0) + '/' + ASTRALS.length;
     const p = tierProbs();
     $('chances').innerHTML = TIERS.map((tr, t) => `<div class="chance-row"><span class="dot" style="background:${tr.color}"></span><span>${tr.name}</span><span>${p[t] > 0 ? pct(p[t]) : '🔒 нужен бур получше'}</span></div>`).join('');
@@ -624,24 +687,31 @@ function update() {
       if (d.secret) {
         if (lvl < 0) { $('di-' + i).textContent = bt >= d.need ? 'Секретный бур. Может найтись в глубине шахты…' : `Секретный бур. Нужен ${DRILLS[d.need].name} или круче…`; return; }
         const extra = [`+${Math.round(d.luck * 100)}% удача`, d.vip ? `+${Math.round(d.vip * 100)}% VIP/Ультра` : ''].filter(Boolean).join(', ');
-        $('di-' + i).textContent = `Ур. ${lvl + 1} · ${(drillPower(i) * speedMul() / STEP).toFixed(0)} астр./с · ${extra}`;
-        if (lvl >= MAX_LVL) { btn.textContent = 'МАКС'; btn.disabled = true; }
-        else { const c = upgradeCost(i); btn.textContent = `⬆ ${fmt(c)}`; btn.disabled = S.coins < c; }
+        if (lvl >= MAX_LVL) { $('di-' + i).textContent = `Ур. ${lvl + 1} (макс) · ${fmtD(drillRateAt(i, lvl))} астр./с · ${extra}`; btn.textContent = 'МАКС'; btn.disabled = true; }
+        else { const b = bulk(l => upgradeCostAt(i, l), lvl, MAX_LVL);
+          $('di-' + i).innerHTML = `Ур. ${lvl + 1} <span class="arrow">→ ${b.to + 1}</span> · ${fmtD(drillRateAt(i, lvl))} <span class="arrow">→ ${fmtD(drillRateAt(i, b.to))}</span> астр./с · ${extra}`;
+          btn.textContent = btnText(b); btn.disabled = S.coins < b.cost; }
         return;
       }
       $('dc-' + i).classList.toggle('locked', locked);
       if (lvl >= 0) {
-        $('di-' + i).textContent = `Ур. ${lvl + 1} · ${(drillPower(i) * speedMul() / STEP).toFixed(1)} астр./с`;
-        if (lvl >= MAX_LVL) { btn.textContent = 'МАКС'; btn.disabled = true; }
-        else { const c = upgradeCost(i); btn.textContent = `⬆ ${fmt(c)}`; btn.disabled = S.coins < c; }
+        if (lvl >= MAX_LVL) { $('di-' + i).textContent = `Ур. ${lvl + 1} (макс) · ${fmtD(drillRateAt(i, lvl))} астр./с`; btn.textContent = 'МАКС'; btn.disabled = true; }
+        else { const b = bulk(l => upgradeCostAt(i, l), lvl, MAX_LVL);
+          $('di-' + i).innerHTML = `Ур. ${lvl + 1} <span class="arrow">→ ${b.to + 1}</span> · ${fmtD(drillRateAt(i, lvl))} <span class="arrow">→ ${fmtD(drillRateAt(i, b.to))}</span> астр./с`;
+          btn.textContent = btnText(b); btn.disabled = S.coins < b.cost; }
       } else {
-        $('di-' + i).textContent = locked ? 'Сначала купи предыдущий бур' : `+${(d.power / STEP).toFixed(1)} астр./с · выше шанс редких`;
+        $('di-' + i).textContent = locked ? 'Сначала купи предыдущий бур' : `+${fmtD(drillRateAt(i, 0))} астр./с · выше шанс редких`;
         btn.textContent = locked ? '🔒' : `Купить ${fmt(d.cost)}`;
         btn.disabled = locked || S.coins < d.cost;
       }
     });
-    $('ulL').textContent = `· ур. ${S.luck}`; $('ubL').textContent = `🪙 ${fmt(luckCost())}`; $('ubL').disabled = S.coins < luckCost();
-    $('ulT').textContent = `· ур. ${S.tap}`;  $('ubT').textContent = `🪙 ${fmt(tapCost())}`;  $('ubT').disabled = S.coins < tapCost();
+    const bL = bulk(luckCostAt, S.luck, 1000), bT = bulk(tapCostAt, S.tap, 1000);
+    $('ulL').innerHTML = `· ур. ${S.luck} <span class="arrow">→ ${bL.to}</span>`;
+    $('uiL').innerHTML = `Удача ×${luckMul().toFixed(2)} <span class="arrow">→ ×${luckAt(bL.to).toFixed(2)}</span>`;
+    $('ubL').textContent = btnText(bL); $('ubL').disabled = S.coins < bL.cost;
+    $('ulT').innerHTML = `· ур. ${S.tap} <span class="arrow">→ ${bT.to}</span>`;
+    $('uiT').innerHTML = `${fmtD(tapPower() / STEP)} <span class="arrow">→ ${fmtD(tapAt(bT.to))}</span> астр. за тап`;
+    $('ubT').textContent = btnText(bT); $('ubT').disabled = S.coins < bT.cost;
   }
   if (tab === 'pets') {
     PETS.forEach((p, i) => {
@@ -652,13 +722,17 @@ function update() {
         $('pi-' + i).textContent = bestTier() >= 5 ? 'Скрытый питомец. Говорят, он прячется где-то в глубине шахты…' : 'Скрытый питомец. Чтобы его найти, нужен бур помощнее…';
         return;
       }
-      $('pc-' + i).classList.toggle('locked', lvl === 0 && S.coins < petCost(i));
+      const b = bulk(l => petCostAt(i, l), lvl, PET_MAX);
+      $('pc-' + i).classList.toggle('locked', lvl === 0 && S.coins < b.cost);
       $('pl-' + i).textContent = lvl ? lvl : '';
       $('pl-' + i).style.display = lvl ? '' : 'none';
-      const bl = Object.entries(p.b).map(([k, v]) => `+${v * Math.max(1, lvl)}% ${BOOST_TXT[k]}`).join(', ');
-      $('pi-' + i).textContent = lvl ? bl : bl + ' за уровень';
-      if (lvl >= PET_MAX) { btn.textContent = 'МАКС'; btn.disabled = true; }
-      else { btn.textContent = (lvl ? '⬆ ' : 'Взять ') + fmt(petCost(i)); btn.disabled = S.coins < petCost(i); }
+      if (lvl >= PET_MAX) {
+        $('pi-' + i).textContent = Object.entries(p.b).map(([k, v]) => `+${v * lvl}% ${BOOST_TXT[k]}`).join(', ') + ' (макс)';
+        btn.textContent = 'МАКС'; btn.disabled = true;
+      } else {
+        $('pi-' + i).innerHTML = Object.entries(p.b).map(([k, v]) => lvl ? `+${v * lvl}% <span class="arrow">→ +${v * b.to}%</span> ${BOOST_TXT[k]}` : `<span class="arrow">+${v * b.to}%</span> ${BOOST_TXT[k]}`).join(', ');
+        btn.textContent = btnText(b, lvl === 0); btn.disabled = S.coins < b.cost;
+      }
     });
   }
   if (tab === 'inv') {
@@ -757,13 +831,23 @@ function loadCloud() {
 
 // ================= Запуск =================
 async function init() {
+  if (MAINTENANCE && !isAdmin()) { showMaintenance(); return; }
   let local = null;
   try { local = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
   const cloud = await loadCloud();
   const best = [local, cloud].filter(Boolean).sort((a, b) => b.t - a.t)[0];
   S = merge(best);
+  // Первый вход в новом сезоне: сообщаем об обнулении
+  let seenSeason = 0; try { seenSeason = +localStorage.getItem('astral_mine_seen_season') || 0; } catch (e) {}
+  const hadOld = (() => { try { return Object.keys(localStorage).some(k => k.startsWith('astral_mine_') && k !== KEY && k !== 'astral_mine_seen_season'); } catch (e) { return false; } })();
+  if (!best && (seenSeason || hadOld) && seenSeason !== SEASON) {
+    setTimeout(() => showModal(`<div style="font-size:64px">🌌</div><h3>Сезон ${SEASON} начался!</h3>
+      <p class="muted" style="margin-top:6px">Прогресс всех игроков обнулён. Начинаем добычу заново, и топ тоже с чистого листа!</p>`, 'Погнали!'), 300);
+  }
+  try { localStorage.setItem('astral_mine_seen_season', SEASON); } catch (e) {}
   const user = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
   if (user) $('hello').textContent = 'Шахтёр ' + user.first_name;
+  if (MAINTENANCE) $('hello').textContent += ' · 🛠 техработы (видишь только ты)';
   await new Promise(r => checkImages(r));
   build();
 
