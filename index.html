@@ -943,7 +943,7 @@ function build() {
     const tot = Object.values(c.w).reduce((a, b) => a + b, 0);
     return `<div class="case-card" style="--cc:${c.color}"><div class="case-top"><div class="case-box">${c.icon}</div>
       <div class="info"><b style="font-size:17px">${c.name}</b><small id="cs-${ci}"></small></div></div>
-      <div class="case-odds">${Object.entries(c.w).map(([r, w]) => `<span style="color:${RAR_COLOR[r]}">${RAR_NAME[r]} ${(w / tot * 100).toFixed(w / tot < 0.1 ? 1 : 0)}%</span>`).join('')}</div>
+      <div class="case-odds">${Object.entries(c.w).map(([r, w]) => `<span style="color:${RAR_COLOR[r]}">${RAR_NAME[r]} ${(+(w / tot * 100).toFixed(2)).toString()}%</span>`).join('')}</div>
       <div class="case-btns"><button class="btn" id="cb-${ci}" onclick="openCase(${ci})">Открыть · 🪙 ${fmt(c.cost)}</button></div></div>`;
   }).join('');
   $('rbDrills').innerHTML = REBORN_DRILLS.map(i => { const d = DRILLS[i]; return `
