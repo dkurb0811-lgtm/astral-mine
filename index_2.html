@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Астральная шахта</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(ellipse at top, #2a1b4f 0%, #120e24 60%, #08060f 100%);
+    color: #eee8ff; overflow: hidden; user-select: none;
+  }
+  #app { display: flex; flex-direction: column; height: var(--tg-viewport-stable-height, 100vh); }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px;
+    background: rgba(0,0,0,.25); border-bottom: 1px solid rgba(180,107,255,.2); }
+  .coins { font-size: 22px; font-weight: 800; color: #ffd75e; }
+  .coins small { display: block; font-size: 11px; color: #a99cc9; font-weight: 500; }
+  .badge { display: flex; align-items: center; gap: 4px; padding: 4px 12px 4px 6px; border-radius: 20px;
+    background: rgba(255,79,163,.15); border: 1px solid rgba(255,79,163,.5); font-weight: 700; font-size: 14px; }
+  main { flex: 1; overflow-y: auto; padding: 14px; }
+  section { display: none; } section.active { display: block; }
+  h2 { font-size: 17px; margin: 4px 0 10px; }
+  .muted { color: #a99cc9; font-size: 13px; }
+
+  /* Шахта */
+  .mine-area { position: relative; height: 290px; display: flex; align-items: center; justify-content: center; }
+  .rock { width: 210px; height: 190px; cursor: pointer; position: relative; margin-top: 50px;
+    background: radial-gradient(circle at 35% 30%, #8d8a99, #4d4a5c 55%, #2b2936);
+    clip-path: polygon(20% 5%, 60% 0, 90% 18%, 100% 55%, 85% 92%, 45% 100%, 10% 88%, 0 50%); }
+  .rock:active { transform: scale(.95); }
+  .rock.shake { animation: shake .15s; }
+  @keyframes shake { 25% { transform: translate(-4px,2px) rotate(-2deg); } 75% { transform: translate(4px,-2px) rotate(2deg); } }
+  .rock svg { position: absolute; }
+  .drill-anim { position: absolute; top: 0; left: 50%; transform: translateX(-50%); animation: bob .5s infinite ease-in-out; z-index: 2; }
+  @keyframes bob { 50% { transform: translate(-50%, 14px); } }
+  .float { position: absolute; display: flex; align-items: center; gap: 4px; font-weight: 800; font-size: 14px;
+    pointer-events: none; animation: floatUp 1s forwards; text-shadow: 0 2px 6px #000; white-space: nowrap; z-index: 3; }
+  @keyframes floatUp { to { transform: translateY(-70px); opacity: 0; } }
+  .particle { position: absolute; width: 7px; height: 7px; border-radius: 2px; pointer-events: none; animation: fly .6s forwards; }
+  @keyframes fly { to { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
+  .stats-row { display: flex; gap: 8px; margin: 10px 0 16px; }
+  .stat { flex: 1; background: rgba(255,255,255,.05); border-radius: 14px; padding: 10px 4px; text-align: center; }
+  .stat b { display: block; font-size: 17px; }
+  .chance-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,.05); }
+  .chance-row span:last-child { margin-left: auto; color: #a99cc9; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .boosts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .boost-chip { background: rgba(255,255,255,.06); border-radius: 10px; padding: 5px 9px; font-size: 12px; }
+
+  /* Свечение редких */
+  .r3 svg, svg.r3 { filter: drop-shadow(0 0 5px #ffb02e); }
+  .r4 svg, svg.r4, img.r4 { animation: vipglow 1.2s infinite alternate; }
+  .r3 img, img.r3 { filter: drop-shadow(0 0 5px #ffb02e); }
+  .r5 svg, svg.r5, img.r5 { animation: ultraglow 1s infinite alternate; }
+  @keyframes ultraglow { 0% { filter: drop-shadow(0 0 6px #ff3b3b); } 50% { filter: drop-shadow(0 0 12px #ffd75e); } 100% { filter: drop-shadow(0 0 16px #3ab0e8); } }
+  @keyframes vipglow { from { filter: drop-shadow(0 0 4px #ff4fa3); } to { filter: drop-shadow(0 0 14px #ffd75e); } }
+
+  /* Карточки */
+  .card { display: flex; align-items: center; gap: 12px; padding: 12px; margin-bottom: 10px;
+    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.07); border-radius: 16px; }
+  .card.locked { opacity: .45; }
+  .card .ico { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; position: relative;
+    background: rgba(0,0,0,.25); border-radius: 14px; flex-shrink: 0; font-size: 30px; }
+  .pet-ico { border: 2px solid #e8b33a; border-radius: 50% !important; box-shadow: 0 0 10px rgba(232,179,58,.4); }
+  .pet-ico i { position: absolute; bottom: -6px; right: -4px; font-style: normal; font-size: 10px; font-weight: 800;
+    background: linear-gradient(135deg,#ffe27a,#c98a10); color: #3a2400; border-radius: 10px; padding: 1px 5px; }
+  .card .info { flex: 1; min-width: 0; }
+  .pet-epic { border-color: rgba(180,107,255,.6); background: linear-gradient(135deg, rgba(180,107,255,.15), rgba(255,255,255,.04)); }
+  .pet-legend { border: 1.5px solid #ffd75e; background: linear-gradient(135deg, rgba(255,215,94,.18), rgba(255,79,163,.12), rgba(58,176,232,.12));
+    animation: legendpulse 1.6s infinite alternate; }
+  .pet-legend .pet-ico { border-color: #ffd75e; box-shadow: 0 0 16px #ffd75e; }
+  @keyframes legendpulse { from { box-shadow: 0 0 6px rgba(255,215,94,.3); } to { box-shadow: 0 0 22px rgba(255,79,163,.55); } }
+  .tag-legend, .tag-epic { font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 6px; vertical-align: middle; margin-left: 4px; }
+  .pet-mega { border: 2px solid transparent; background: linear-gradient(#1d1636,#1d1636) padding-box,
+    linear-gradient(90deg,#ff3b3b,#ffd75e,#4dff88,#3ab0e8,#b46bff,#ff3b3b) border-box; background-size: 100% 100%, 300% 100%;
+    animation: megaborder 3s linear infinite; }
+  .pet-mega .pet-ico { border-color: #fff; box-shadow: 0 0 18px #ff4fa3, 0 0 30px #3ab0e8; }
+  @keyframes megaborder { to { background-position: 0 0, 300% 0; } }
+  .secret-drill svg { animation: ultraglow 1s infinite alternate; }
+  .pet-secret { border: 1.5px dashed rgba(255,255,255,.3); }
+  .pet-secret .pet-ico { border-color: #555; box-shadow: none; filter: grayscale(1); }
+  .tag-mega { font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 6px; vertical-align: middle; margin-left: 4px;
+    background: linear-gradient(90deg,#ff3b3b,#ffd75e,#3ab0e8,#b46bff); color: #fff; text-shadow: 0 1px 2px #000; }
+  .mega-reveal { display: inline-block; animation: megaspin 1.2s ease-out, ultraglow 1s infinite alternate; border-radius: 50%; }
+  @keyframes megaspin { from { transform: scale(0) rotate(-180deg); } to { transform: scale(1) rotate(0); } }
+  .mega-text { background: linear-gradient(90deg,#ff3b3b,#ffd75e,#4dff88,#3ab0e8,#b46bff); -webkit-background-clip: text; background-clip: text; color: transparent; font-size: 20px; }
+  .tag-legend { background: linear-gradient(90deg,#ffd75e,#ff4fa3); color: #2a0a1a; }
+  .tag-epic { background: #9a4dff; color: #fff; }
+  .tag-rare { font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 6px; vertical-align: middle; margin-left: 4px; background: #2f7fe0; color: #fff; }
+  .pet-rare { border-color: rgba(77,163,255,.5); background: linear-gradient(135deg, rgba(77,163,255,.12), rgba(255,255,255,.04)); }
+  .card .info b { display: block; font-size: 15px; }
+  .card .info small { color: #a99cc9; font-size: 12px; }
+  .btn { border: 0; border-radius: 12px; padding: 10px 12px; font-weight: 700; font-size: 13px; color: #1a1030;
+    background: linear-gradient(135deg, #ffd75e, #ffb02e); cursor: pointer; white-space: nowrap; min-width: 86px; }
+  .btn:disabled { background: #3a3352; color: #7d7398; }
+  .btn.pink { background: linear-gradient(135deg, #ff8ac4, #ff4fa3); color: #fff; }
+  .btn.ghost { background: rgba(255,255,255,.1); color: #eee8ff; }
+  .btn.wide { width: 100%; padding: 14px; font-size: 15px; margin-bottom: 12px; }
+
+  /* Коллекция */
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
+  .cell { position: relative; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08);
+    border-radius: 14px; padding: 6px 2px 4px; text-align: center; cursor: pointer; }
+  .cell .cnt { position: absolute; top: 3px; right: 5px; font-size: 11px; font-weight: 800; }
+  .cell .nm { font-size: 9.5px; color: #a99cc9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; }
+  .tier-title { display: flex; justify-content: space-between; font-weight: 700; margin: 6px 0 8px; font-size: 14px; }
+
+  nav { display: flex; background: rgba(0,0,0,.4); border-top: 1px solid rgba(180,107,255,.2); padding-bottom: env(safe-area-inset-bottom); }
+  nav button { flex: 1; background: none; border: 0; color: #8d82ad; padding: 9px 0 11px; font-size: 10px; cursor: pointer; }
+  nav button div { font-size: 21px; margin-bottom: 2px; }
+  nav button.active { color: #e2c2ff; }
+
+  #modal { position: fixed; inset: 0; background: rgba(0,0,0,.72); display: none; align-items: center; justify-content: center; z-index: 10; padding: 24px; }
+  #modal.show { display: flex; }
+  .modal-box { background: #1d1636; border: 1px solid rgba(180,107,255,.5); border-radius: 20px; padding: 20px; width: 100%; max-width: 340px; text-align: center; }
+  .modal-box h3 { margin: 8px 0 4px; }
+  .modal-box .list { text-align: left; margin: 12px 0; max-height: 260px; overflow-y: auto; }
+  .modal-box .row { display: flex; gap: 8px; margin-top: 10px; }
+  .modal-box .row .btn { flex: 1; }
+  #toast { position: fixed; top: 76px; left: 50%; transform: translateX(-50%) scale(.8); opacity: 0; pointer-events: none;
+    background: linear-gradient(135deg, #5b2fb8, #b46bff); padding: 10px 18px; border-radius: 16px; font-weight: 800;
+    box-shadow: 0 0 30px #b46bff; transition: .3s; z-index: 20; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  #toast.show { opacity: 1; transform: translateX(-50%) scale(1); }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="coins">🪙 <span id="coins">0</span><small id="hello">Шахтёр</small></div>
+    <div class="badge" id="vipBadge"></div>
+  </header>
+
+  <main>
+    <section id="tab-mine" class="active">
+      <div class="mine-area" id="mineArea">
+        <div class="drill-anim" id="drillAnim"></div>
+        <div class="rock" id="rock"></div>
+      </div>
+      <p class="muted" style="text-align:center">Тапай по камню, буры копают астралы и без тебя</p>
+      <div class="stats-row">
+        <div class="stat"><b id="perSec">0</b><span class="muted">астр./сек</span></div>
+        <div class="stat"><b id="tapStat">0</b><span class="muted">за тап</span></div>
+        <div class="stat"><b id="collStat">0</b><span class="muted">коллекция</span></div>
+      </div>
+      <div class="boosts" id="boosts"></div>
+      <h2>Шансы добычи</h2>
+      <div id="chances"></div>
+    </section>
+
+    <section id="tab-drills">
+      <h2>Буры</h2>
+      <p class="muted" style="margin-bottom:12px">Чем круче бур, тем быстрее он копает и тем более редкие астралы ему доступны. Сырный (VIP) выпадает с Золотого бура, Мартовский (ультра) — с Алмазного.</p>
+      <div id="drillList"></div>
+      <h2 style="margin-top:16px">Улучшения</h2>
+      <div id="upgradeList"></div>
+    </section>
+
+    <section id="tab-pets">
+      <h2>Питомцы</h2>
+      <p class="muted" style="margin-bottom:12px">Питомцы дают бусты: копают быстрее, приносят больше монет или повышают удачу. Каждый уровень усиливает буст.</p>
+      <div id="petList"></div>
+    </section>
+
+    <section id="tab-top">
+      <h2>🏆 Топ шахтёров</h2>
+      <p class="muted" style="margin-bottom:12px">Место считается по всем монетам, заработанным за игру</p>
+      <div class="card" id="myRank"></div>
+      <div id="topList"><p class="muted">Загрузка…</p></div>
+    </section>
+
+    <section id="tab-inv">
+      <button class="btn wide" id="sellAll" onclick="sellAll()" style="margin-bottom:4px">Продать</button>
+      <p class="muted" style="text-align:center;margin-bottom:12px;font-size:12px">Легендарные и VIP не продаются кнопкой, только вручную</p>
+      <div id="invList"></div>
+    </section>
+  </main>
+
+  <nav>
+    <button class="active" data-tab="mine"><div>⛏️</div>Шахта</button>
+    <button data-tab="drills"><div>🔩</div>Буры</button>
+    <button data-tab="pets"><div>🐾</div>Питомцы</button>
+    <button data-tab="inv"><div>💎</div>Коллекция</button>
+    <button data-tab="top"><div>🏆</div>Топ</button>
+  </nav>
+</div>
+
+<div id="modal"><div class="modal-box" id="modalBox"></div></div>
+<div id="toast"></div>
+
+<script>
+// ================= Telegram =================
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) {
+  tg.ready(); tg.expand();
+  try { tg.setHeaderColor('#120e24'); tg.setBackgroundColor('#120e24'); } catch (e) {}
+  try { tg.disableVerticalSwipes(); } catch (e) {}
+}
+const haptic = (t = 'light') => { try { tg.HapticFeedback.impactOccurred(t); } catch (e) {} };
+const hapticOk = () => { try { tg.HapticFeedback.notificationOccurred('success'); } catch (e) {} };
+const hasCloud = () => !!(tg && tg.CloudStorage && tg.isVersionAtLeast && tg.isVersionAtLeast('6.9'));
+
+// ================= Редкости =================
+const TIERS = [
+  { name: 'Обычные',     color: '#a9b1bd', price: 5 },
+  { name: 'Редкие',      color: '#4da3ff', price: 40 },
+  { name: 'Эпические',   color: '#b46bff', price: 300 },
+  { name: 'Легендарные', color: '#ffb02e', price: 2500 },
+  { name: 'VIP',         color: '#ff4fa3', price: 50000 },
+  { name: 'Ультра',      color: '#ff3b3b', price: 500000 },
+];
+const TIER_ONE = ['Обычный', 'Редкий', 'Эпический', 'Легендарный', 'VIP', 'УЛЬТРА-РЕДКИЙ'];
+
+// ================= Астралы =================
+// c — цвета градиента, fx — особый эффект на картинке
+const ASTRALS = [
+  // Обычные
+  { n: 'Хрустальный',  t: 0, c: ['#ffffff','#dfe9f5','#b9c8dc'] },
+  { n: 'Серебряный',   t: 0, c: ['#f2f2f2','#a8adb5','#6c727c'] },
+  { n: 'Дымчатый',     t: 0, c: ['#9ea2aa','#5a5e66','#2d3036'] },
+  { n: 'Розовый',      t: 0, c: ['#ffd6ea','#ff8cc0','#d4558f'] },
+  { n: 'Небесный',     t: 0, c: ['#e0f4ff','#7cc6ff','#3b82d6'] },
+  { n: 'Мятный',       t: 0, c: ['#e3ffe9','#7de8a0','#2fae5e'] },
+  { n: 'Лимонный',     t: 0, c: ['#fffbd1','#ffe45c','#d9a91a'] },
+  { n: 'Персиковый',   t: 0, c: ['#ffe6cf','#ffad6b','#e0702e'] },
+  // Редкие
+  { n: 'Рубиновый',    t: 1, c: ['#ff9aa8','#e0233f','#7a0d1f'] },
+  { n: 'Изумрудный',   t: 1, c: ['#b8ffd0','#16c75a','#08602b'] },
+  { n: 'Сапфировый',   t: 1, c: ['#a8c8ff','#2856e0','#0f2470'] },
+  { n: 'Аметистовый',  t: 1, c: ['#e6c8ff','#9a4dff','#4b1a8a'] },
+  { n: 'Золотой',      t: 1, c: ['#fff3b0','#f2c230','#a8730a'] },
+  { n: 'Бирюзовый',    t: 1, c: ['#c6fff6','#2fd8c4','#0f7d74'] },
+  { n: 'Медный',       t: 1, c: ['#f2c2a0','#b0643a','#5e2e16'] },
+  { n: 'Лаймовый',     t: 1, c: ['#f2ffb0','#a8e02a','#4f7d0a'] },
+  // Эпические
+  { n: 'Радужный',     t: 2, c: ['#ff5c5c','#ffd84d','#4dff88','#4db8ff','#b84dff'] },
+  { n: 'Перламутровый',t: 2, c: ['#ffffff','#ffd6f5','#d6f0ff','#e8d6ff'] },
+  { n: 'Закатный',     t: 2, c: ['#ffe14d','#ff8a3d','#e8344f','#7a1f6b'] },
+  { n: 'Ледяной',      t: 2, c: ['#ffffff','#b8f2ff','#5cc8ff'], fx: 'sparkle' },
+  { n: 'Сердечный',    t: 2, c: ['#fff0f6','#ffc2dc','#a8e0ff'], fx: 'heart' },
+  { n: 'Токсичный',    t: 2, c: ['#d8ff8a','#4be04b','#1a7d1a'], fx: 'toxic' },
+  { n: 'Обсидиановый', t: 2, c: ['#6b6b78','#2a2a33','#0a0a10'] },
+  { n: 'Мозаичный',    t: 2, c: ['#ff3cac','#ffe600','#00e0ff'], fx: 'mosaic' },
+  // Легендарные
+  { n: 'Галактический',t: 3, c: ['#ff7ae0','#5b3cff','#120a40'], fx: 'stars' },
+  { n: 'Огненный',     t: 3, c: ['#fff27a','#ff9a1f','#e8341c'], fx: 'flame' },
+  { n: 'Змеиный',      t: 3, c: ['#d8ff9a','#5fcf3a','#1f6b1a'], fx: 'band' },
+  { n: 'Цветущий',     t: 3, c: ['#ffffff','#ffd1f0','#c8f7d8'], fx: 'flower' },
+  { n: 'Кровавый',     t: 3, c: ['#ff6b6b','#8a0a1a','#2a0005'] },
+  { n: 'Лунный',       t: 3, c: ['#ffffff','#c9d6ff','#6a78b8'], fx: 'moon' },
+  { n: 'Призрачный',   t: 3, c: ['#ffffff','#e6f0ff','#c8b8ff'], fx: 'ghost' },
+  { n: 'Солнечный',    t: 3, c: ['#ffffff','#ffe9a8','#ffb21f'], fx: 'sparkle' },
+  // VIP
+  { n: 'Сырный астрал',   t: 4, c: ['#fff6b0','#ffd34a','#f0a020'], fx: 'cheese' },
+  // Ультра-редкий
+  { n: 'Мартовский астрал', t: 5, c: ['#ff8ab8','#e8346f','#3ab0e8'], fx: 'planes' },
+];
+// Свои картинки: положи файлы в папку img рядом с index.html.
+// Астралы: img/a1.png ... img/a34.png (по порядку списка выше)
+// Питомцы: pet1 = Растовуха, pet2 = 42, pet3 = Дымка, pet4 = 42 Прайм, pet5 = WW, pet6 = Итумка, pet7 = Рутик, pet8 = Хоспик
+ASTRALS.forEach((a, i) => a.img = `img/a${i + 1}.png`);
+const BY_TIER = TIERS.map((_, t) => ASTRALS.map((a, i) => a.t === t ? i : -1).filter(i => i >= 0));
+
+// ================= Буры =================
+const DRILLS = [
+  { name: 'Ручной бур',     power: 1,    cost: 0,         color: '#9aa0a6' },
+  { name: 'Медный бур',     power: 4,    cost: 150,       color: '#d9824a' },
+  { name: 'Железный бур',   power: 12,   cost: 1500,      color: '#c9ced6' },
+  { name: 'Стальной бур',   power: 35,   cost: 12000,     color: '#7b8794' },
+  { name: 'Золотой бур',    power: 100,  cost: 90000,     color: '#f5c542' },
+  { name: 'Алмазный бур',   power: 300,  cost: 750000,    color: '#5ee7ff' },
+  { name: 'Плазменный бур', power: 900,  cost: 6000000,   color: '#ff5ce1' },
+  { name: 'Астральный бур', power: 3000, cost: 45000000,  color: '#b46bff' },
+  // Секретные буры: не продаются, случайно находятся в шахте. luck/vip — дополнительные бонусы
+  { name: 'Флоурит', power: 6000,  cost: 60000000,  color: '#3affd0', secret: true, luck: 0.5, vip: 0, need: 3, text: 'Бур из глубин, названный в честь Флоу' },
+  { name: 'Кенриум', power: 25000, cost: 400000000, color: '#ff3b3b', secret: true, luck: 1.5, vip: 0.75, need: 6, text: 'Самый редкий бур в игре, назван в честь Кенри' },
+];
+const REG_DRILLS = DRILLS.map((d, i) => d.secret ? -1 : i).filter(i => i >= 0);
+const SECRET_DRILLS = DRILLS.map((d, i) => d.secret ? i : -1).filter(i => i >= 0);
+const secretBonus = k => SECRET_DRILLS.reduce((s, i) => s + (S.drills[i] >= 0 ? DRILLS[i][k] : 0), 0);
+
+// ================= Питомцы-бусты =================
+// b — бусты за 1 уровень в процентах
+const PETS = [
+  { name: 'Растовуха',  emoji: '🐹', cost: 400,     b: { luck: 10 },                         img: 'img/pet1.png', rare: 'rare' },
+  { name: '42',         emoji: '🐩', cost: 1200,    b: { money: 15 },                        img: 'img/pet2.png', rare: 'rare' },
+  { name: 'Дымка',      emoji: '🐈', cost: 5000,    b: { speed: 10 },                        img: 'img/pet3.png', rare: 'rare' },
+  { name: '42 Прайм',   emoji: '🧸', cost: 40000,   b: { tap: 30, luck: 5 },                 img: 'img/pet4.png', rare: 'epic' },
+  { name: 'WW',         emoji: '🐕', cost: 2500000, b: { vip: 35, speed: 15, money: 15, luck: 10 }, img: 'img/pet5.png', rare: 'legend' },
+  // Скрытый МЕГА-редкий питомец: не продаётся, случайно находится в шахте (с Алмазного бура)
+  { name: 'Итумка',     emoji: '🐆', cost: 20000000, b: { speed: 40, money: 40, luck: 25, vip: 60, tap: 40 }, img: 'img/pet6.png', rare: 'mega', hidden: true },
+  { name: 'Рутик',      emoji: '🐶', cost: 300000,  b: { money: 25, tap: 20 },                   img: 'img/pet7.png', rare: 'epic' },
+  { name: 'Хоспик',     emoji: '🐈‍⬛', cost: 1200000, b: { luck: 20, speed: 15, vip: 20 },          img: 'img/pet8.png', rare: 'epic' },
+];
+const ITUMKA = PETS.findIndex(p => p.name === 'Итумка');
+// Порядок показа питомцев в списке (от простых к самым редким)
+const PET_ORDER = [0, 1, 2, 3, 6, 7, 4, 5];
+// Шанс найти Итумку за 1 секунду работы буров
+function itumkaChance() {
+  const bt = bestTier(); if (bt < 5) return 0;
+  return (1 / 25000) * (1 + 0.5 * (bt - 5)) * luckMul();
+}
+// Шансы найти секретные буры за 1 секунду
+function drillChance(i) {
+  const d = DRILLS[i], bt = bestTier(); if (bt < d.need) return 0;
+  const base = d.name === 'Кенриум' ? 1 / 90000 : 1 / 15000;
+  return base * (1 + 0.4 * (bt - d.need)) * luckMul();
+}
+function tryFinds(seconds) {
+  SECRET_DRILLS.forEach(i => {
+    if (S.drills[i] >= 0) return;
+    if (Math.random() < 1 - Math.pow(1 - drillChance(i), seconds)) {
+      S.drills[i] = 0; save(true); build(); hapticOk();
+      const top = i === SECRET_DRILLS[SECRET_DRILLS.length - 1];
+      showModal(`<div class="mega-reveal secret-drill" style="padding:10px">${drillSvg(DRILLS[i].color, 120)}</div>
+        <h3 class="mega-text">${top ? 'САМЫЙ РЕДКИЙ БУР!' : 'СЕКРЕТНЫЙ БУР!'}</h3>
+        <p style="font-size:22px;font-weight:800;margin:6px 0">${DRILLS[i].name}</p><p class="muted">${DRILLS[i].text}</p>`, 'Забрать бур');
+    }
+  });
+  tryItumka(seconds);
+}
+function tryItumka(seconds) {
+  if (S.pets[ITUMKA] > 0) return;
+  const p = 1 - Math.pow(1 - itumkaChance(), seconds);
+  if (Math.random() < p) {
+    S.pets[ITUMKA] = 1; save(true); build(); hapticOk();
+    showModal(`<div class="mega-reveal">${petIconBig(ITUMKA)}</div><h3 class="mega-text">МЕГА-РЕДКИЙ ПИТОМЕЦ!</h3>
+      <p style="font-size:22px;font-weight:800;margin:6px 0">Итумка</p>
+      <p class="muted">Бенгальский кот из самой глубины шахты. Ускоряет всё сразу!</p>`, 'Забрать Итумку');
+  }
+}
+const BOOST_TXT = { luck: 'удача', money: 'монеты', speed: 'скорость', tap: 'сила тапа', vip: 'шанс VIP/Ультра' };
+
+// ================= Таблица лидеров (Supabase) =================
+// Вставь сюда данные своего проекта Supabase (инструкция в чате). Пока пусто — вкладка «Топ» покажет подсказку.
+const SUPABASE_URL = '';   // например 'https://abcdxyz.supabase.co'
+const SUPABASE_KEY = '';   // ключ anon / publishable
+const PET_MAX = 20;
+
+const STEP = 5, MAX_LVL = 25, KEY = 'astral_mine_v3';
+
+function defaults() {
+  return {
+    coins: 0, items: Array(ASTRALS.length).fill(0), found: Array(ASTRALS.length).fill(0),
+    drills: DRILLS.map((_, i) => i === 0 ? 0 : -1), pets: PETS.map(() => 0),
+    luck: 0, tap: 0, progress: 0, total: 0, earned: 0, t: Date.now()
+  };
+}
+let S = defaults();
+
+// ================= Формулы =================
+const fmt = n => {
+  if (n < 1000) return Math.floor(n).toString();
+  const u = ['K','M','B','T','Qa']; let i = -1;
+  while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; }
+  return n.toFixed(n < 10 ? 2 : n < 100 ? 1 : 0) + u[i];
+};
+const pct = v => v >= 0.1 ? (v * 100).toFixed(1) + '%' : v >= 0.001 ? (v * 100).toFixed(2) + '%' : (v * 100).toFixed(3) + '%';
+const petBoost = kind => 1 + PETS.reduce((s, p, i) => s + S.pets[i] * (p.b[kind] || 0), 0) / 100;
+const speedMul = () => petBoost('speed');
+const moneyMul = () => petBoost('money');
+const luckMul  = () => petBoost('luck') + S.luck * 0.05 + secretBonus('luck');
+const vipMul   = () => petBoost('vip') + secretBonus('vip');
+const tapMul   = () => petBoost('tap');
+
+const drillPower = i => S.drills[i] < 0 ? 0 : DRILLS[i].power * (1 + 0.5 * S.drills[i]);
+const totalPower = () => DRILLS.reduce((s, _, i) => s + drillPower(i), 0) * speedMul();
+const bestTier = () => { let b = 0; REG_DRILLS.forEach(i => { if (S.drills[i] >= 0) b = i; }); return b; };
+const tapPower = () => ((1 + S.tap) * 5 + totalPower() * 0.3) * tapMul();
+const upgradeCost = i => Math.ceil(Math.max(20, DRILLS[i].cost * 0.5) * Math.pow(1.6, S.drills[i]));
+const luckCost = () => Math.ceil(300 * Math.pow(2.1, S.luck));
+const tapCost  = () => Math.ceil(60 * Math.pow(1.85, S.tap));
+const petCost  = i => Math.ceil(PETS[i].cost * Math.pow(1.8, S.pets[i]));
+const sellPrice = i => Math.floor(TIERS[ASTRALS[i].t].price * moneyMul());
+
+// Шансы по редкостям: чем лучше бур — тем больше шанс на редкие
+function tierProbs() {
+  const bt = bestTier(), L = luckMul();
+  const w = [1, 0, 0, 0];
+  if (bt >= 1) w[1] = 0.08 * (1 + 0.35 * (bt - 1)) * L;
+  if (bt >= 3) w[2] = 0.012 * (1 + 0.45 * (bt - 3)) * L;
+  if (bt >= 5) w[3] = 0.0025 * (1 + 0.6 * (bt - 5)) * L;
+  const vip = bt >= 4 ? Math.min(0.01, 0.00006 * Math.pow(2.2, bt - 4) * L * vipMul()) : 0;
+  const ultra = bt >= 5 ? Math.min(0.002, 0.000008 * Math.pow(2.5, bt - 5) * L * vipMul()) : 0;
+  const sum = w.reduce((a, b) => a + b, 0);
+  return [...w.map(x => (1 - vip - ultra) * x / sum), vip, ultra];
+}
+function rollTier(p) { let r = Math.random(), a = 0; for (let i = 0; i < p.length; i++) { a += p[i]; if (r < a) return i; } return 0; }
+const pick = t => BY_TIER[t][Math.floor(Math.random() * BY_TIER[t].length)];
+
+let lastRareToast = 0;
+function mine(n) {
+  const p = tierProbs(), got = {};
+  const add = (i, c) => { got[i] = (got[i] || 0) + c; };
+  if (n <= 40) for (let k = 0; k < n; k++) add(pick(rollTier(p)), 1);
+  else p.forEach((pt, t) => {
+    const e = n * pt; let c = Math.floor(e) + (Math.random() < e % 1 ? 1 : 0);
+    if (c <= 30) for (let k = 0; k < c; k++) add(pick(t), 1);
+    else BY_TIER[t].forEach(i => add(i, Math.round(c / BY_TIER[t].length)));
+  });
+  let best = -1; const fresh = {};
+  for (const k in got) {
+    const i = +k; S.items[i] += got[i];
+    if (!S.found[i]) { S.found[i] = 1; invDirty = true; fresh[i] = 1; }
+    if (best < 0 || ASTRALS[i].t > ASTRALS[best].t) best = i;
+  }
+  S.total += n;
+  if (best >= 0 && ASTRALS[best].t >= 4 && !fresh[best]) {
+    // уже находил раньше — только короткое уведомление (не чаще раза в 4 сек)
+    if (Date.now() - lastRareToast > 4000) { lastRareToast = Date.now(); hapticOk(); showToast(`${crystal(best, 30)} ${ASTRALS[best].n} ×${got[best]}!`); }
+  } else if (best >= 0 && ASTRALS[best].t === 5) {
+    hapticOk();
+    showModal(`<div class="r5">${crystal(best, 130)}</div><h3 style="color:#ff3b3b">УЛЬТРА-РЕДКИЙ!</h3><p>${ASTRALS[best].n}</p><p class="muted" style="margin-top:6px">Это самый редкий астрал в игре</p>`, 'Невероятно!');
+  } else if (best >= 0 && ASTRALS[best].t === 4) {
+    hapticOk();
+    showModal(`<div class="r4">${crystal(best, 120)}</div><h3 style="color:#ff4fa3">VIP-астрал!</h3><p>${ASTRALS[best].n}</p><p class="muted" style="margin-top:6px">Шанс выпадения меньше 1%</p>`, 'Круто!');
+  } else if (best >= 0 && ASTRALS[best].t >= (bestTier() >= 4 ? 3 : 2) && Date.now() - lastRareToast > 2500) {
+    lastRareToast = Date.now();
+    haptic('heavy');
+    showToast(`${crystal(best, 30)} ${ASTRALS[best].n}!`);
+  }
+  return got;
+}
+function addProgress(x) {
+  S.progress += x;
+  const n = Math.floor(S.progress / STEP);
+  if (n > 0) { S.progress -= n * STEP; return mine(n); }
+  return null;
+}
+
+// ================= Картинки =================
+let gid = 0;
+const IMG_OK = {};
+function checkImages(done) {
+  const list = [...ASTRALS.map(a => a.img), ...PETS.map(p => p.img)];
+  let left = list.length;
+  list.forEach(src => { const im = new Image(); im.onload = () => { IMG_OK[src] = 1; if (--left === 0) done(); }; im.onerror = () => { if (--left === 0) done(); }; im.src = src; });
+}
+const petIconBig = i => IMG_OK[PETS[i].img] ? `<img src="${PETS[i].img}" width="130" height="130" style="object-fit:cover;border-radius:50%">` : `<div style="font-size:90px">${PETS[i].emoji}</div>`;
+const petIcon = i => IMG_OK[PETS[i].img] ? `<img src="${PETS[i].img}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : PETS[i].emoji;
+function crystal(i, size = 48, locked = false) {
+  const a = ASTRALS[i], id = 'g' + (gid++);
+  const glowCls = locked ? '' : a.t >= 5 ? 'r5' : a.t >= 4 ? 'r4' : a.t >= 3 ? 'r3' : '';
+  if (IMG_OK[a.img]) return `<img class="${glowCls}" src="${a.img}" width="${size}" height="${size}" style="object-fit:contain;${locked ? 'filter:brightness(0) opacity(.35)' : ''}">`;
+  const cs = locked ? ['#3d3558', '#2b2540', '#1f1a30'] : a.c;
+  const stops = cs.map((c, k) => `<stop offset="${k / (cs.length - 1)}" stop-color="${c}"/>`).join('');
+  const cheese = a.fx === 'cheese' && !locked;
+  const st = cheese ? '#b86b12' : 'rgba(20,10,40,.4)', sw = cheese ? 3.5 : 1.6;
+  let fx = '';
+  if (!locked) switch (a.fx) {
+    case 'stars': fx = [[45,30,1.8],[56,62,1.4],[40,72,1.1],[22,62,1.2],[78,68,1.4],[54,42,1],[60,22,1]].map(([x,y,r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff"/>`).join(''); break;
+    case 'sparkle': fx = [[40,28],[62,60],[24,62]].map(([x,y]) => `<path d="M${x},${y-6} L${x+1.5},${y-1.5} L${x+6},${y} L${x+1.5},${y+1.5} L${x},${y+6} L${x-1.5},${y+1.5} L${x-6},${y} L${x-1.5},${y-1.5}Z" fill="#fff"/>`).join(''); break;
+    case 'cheese': fx = [[50,24,6,4],[40,60,4,5],[60,72,5,4],[22,66,3,4],[80,70,3,3],[58,44,3,3],[44,82,3,2],[72,52,2,3]].map(([x,y,rx,ry]) => `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="#d4881f"/>`).join(''); break;
+    case 'planes': fx = [[6,30,20],[70,20,-25],[60,74,15],[4,74,-10],[78,56,30]].map(([x,y,r]) => `<g transform="translate(${x} ${y}) rotate(${r})"><polygon points="0,0 22,7 0,14 6,7" fill="#fff" stroke="#2e8fd0" stroke-width="1.5"/></g>`).join(''); break;
+    case 'heart': fx = `<path d="M50,78 C30,64 34,48 44,50 C48,51 50,55 50,55 C50,55 52,51 56,50 C66,48 70,64 50,78Z" fill="#ff2d6f"/>`; break;
+    case 'toxic': fx = `<circle cx="50" cy="62" r="11" fill="#1a3a10" opacity=".85"/><text x="50" y="68" font-size="17" text-anchor="middle" fill="#d8ff8a">☢</text>`; break;
+    case 'mosaic': fx = `<polyline points="30,34 42,62 34,92" stroke="#222" stroke-width="2" fill="none"/><polyline points="70,34 58,62 66,92" stroke="#222" stroke-width="2" fill="none"/><polyline points="42,62 58,62" stroke="#222" stroke-width="2"/><polyline points="22,38 24,70 36,90" stroke="#222" stroke-width="2" fill="none"/>`; break;
+    case 'flame': fx = `<path d="M50,88 C36,80 40,64 46,58 C46,66 50,68 52,62 C54,54 50,48 54,42 C60,52 66,62 62,74 C60,82 56,86 50,88Z" fill="#fff6b0" opacity=".85"/>`; break;
+    case 'band': fx = `<path d="M8,72 Q50,44 92,68" stroke="#e8b33a" stroke-width="7" fill="none"/><path d="M8,72 Q50,44 92,68" stroke="#a8730a" stroke-width="1.5" stroke-dasharray="3 4" fill="none"/>`; break;
+    case 'flower': fx = [[50,70,'#ff7ab8'],[30,66,'#ffd84d'],[68,62,'#ff9ad0']].map(([x,y,c]) => [0,72,144,216,288].map(r => `<circle cx="${x + 4*Math.cos(r*Math.PI/180)}" cy="${y + 4*Math.sin(r*Math.PI/180)}" r="3" fill="${c}"/>`).join('') + `<circle cx="${x}" cy="${y}" r="2.2" fill="#fff"/>`).join(''); break;
+    case 'moon': fx = `<circle cx="50" cy="60" r="11" fill="#fffbe0"/><circle cx="55" cy="56" r="10" fill="#b8c4f0"/>`; break;
+  }
+  const ghost = a.fx === 'ghost' && !locked ? ' opacity=".65"' : '';
+  const cls = glowCls;
+  return `<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 100 100"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">${stops}</linearGradient></defs>
+  <g${ghost}><g stroke="${st}" stroke-width="${sw}" stroke-linejoin="round" fill="url(#${id})">
+  <polygon points="8,62 22,38 38,52 36,90 14,86"/><polygon points="92,62 78,38 62,52 64,90 86,86"/>
+  <polygon points="50,4 70,34 66,94 34,94 30,34"/></g>
+  <polygon points="50,4 30,34 34,94 50,94" fill="#fff" opacity="${cheese ? .12 : .22}"/>
+  <polygon points="50,4 70,34 66,94 50,94" fill="#000" opacity=".12"/>
+  <polyline points="30,34 50,50 70,34" stroke="${st}" stroke-width="${sw}" fill="none"/>
+  <line x1="50" y1="50" x2="50" y2="94" stroke="${st}" stroke-width="${sw}"/>${fx}</g>
+  ${locked ? '<text x="50" y="66" font-size="26" text-anchor="middle" fill="#6d6290" font-weight="800">?</text>' : ''}</svg>`;
+}
+const drillSvg = (c, s = 40) => `<svg width="${s}" height="${s}" viewBox="0 0 40 40">
+  <rect x="13" y="1" width="14" height="11" rx="3" fill="#555a66"/><rect x="10" y="11" width="20" height="7" rx="2" fill="${c}"/>
+  <polygon points="11,18 29,18 20,39" fill="${c}"/><polyline points="13,21 27,24 15,28 25,31 18,34" stroke="rgba(0,0,0,.35)" stroke-width="2" fill="none"/></svg>`;
+
+// ================= Действия =================
+function drillAction(i) {
+  const lvl = S.drills[i];
+  if (lvl < 0) {
+    if (DRILLS[i].secret) return;
+    if (i > bestTier() + 1 || S.coins < DRILLS[i].cost) return;
+    S.coins -= DRILLS[i].cost; S.drills[i] = 0; haptic('medium');
+    showToast(`🔩 ${DRILLS[i].name} куплен!`);
+  } else {
+    const c = upgradeCost(i);
+    if (lvl >= MAX_LVL || S.coins < c) return;
+    S.coins -= c; S.drills[i]++; haptic();
+  }
+  renderDrillAnim(); save();
+}
+function buyLuck() { const c = luckCost(); if (S.coins < c) return; S.coins -= c; S.luck++; haptic(); save(); }
+function buyTap()  { const c = tapCost();  if (S.coins < c) return; S.coins -= c; S.tap++;  haptic(); save(); }
+function buyPet(i) {
+  if (PETS[i].hidden && !S.pets[i]) return;
+  const c = petCost(i);
+  if (S.pets[i] >= PET_MAX || S.coins < c) return;
+  S.coins -= c; S.pets[i]++; haptic('medium');
+  if (S.pets[i] === 1) showToast(`${PETS[i].emoji} ${PETS[i].name} с тобой!`);
+  save();
+}
+function sell(i, all) {
+  const n = all ? S.items[i] : Math.min(1, S.items[i]);
+  if (!n) return;
+  S.items[i] -= n; S.coins += n * sellPrice(i); S.earned += n * sellPrice(i); haptic(); save();
+  openItem(i);
+}
+function sellAll() {
+  let sum = 0;
+  ASTRALS.forEach((a, i) => { if (a.t <= 2) { sum += S.items[i] * sellPrice(i); S.items[i] = 0; } });
+  if (sum) { S.coins += sum; S.earned += sum; haptic('medium'); showToast(`🪙 +${fmt(sum)}`); save(); }
+}
+function openItem(i) {
+  const a = ASTRALS[i];
+  if (!S.found[i]) return;
+  const tr = TIERS[a.t];
+  showModal(`${crystal(i, 110)}<h3>${a.n}</h3><div style="color:${tr.color};font-weight:700;font-size:13px">${TIER_ONE[a.t]}</div>
+    <p class="muted" style="margin-top:8px">У тебя: <b style="color:#fff">${fmt(S.items[i])}</b> · Цена: 🪙 ${fmt(sellPrice(i))}</p>
+    <div class="row"><button class="btn ghost" ${S.items[i] ? '' : 'disabled'} onclick="sell(${i}, false)">Продать 1</button>
+    <button class="btn ${a.t >= 3 ? 'pink' : ''}" ${S.items[i] ? '' : 'disabled'} onclick="sell(${i}, true)">Продать все</button></div>`, 'Закрыть');
+}
+
+// ================= Тап по камню =================
+const rock = document.getElementById('rock'), area = document.getElementById('mineArea');
+rock.addEventListener('pointerdown', e => {
+  haptic('light');
+  rock.classList.remove('shake'); void rock.offsetWidth; rock.classList.add('shake');
+  const got = addProgress(tapPower());
+  const r = area.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  for (let k = 0; k < 6; k++) {
+    const p = document.createElement('div'); p.className = 'particle';
+    p.style.left = x + 'px'; p.style.top = y + 'px'; p.style.background = '#b46bff';
+    p.style.setProperty('--dx', (Math.random() * 80 - 40) + 'px');
+    p.style.setProperty('--dy', (Math.random() * -60 - 10) + 'px');
+    area.appendChild(p); setTimeout(() => p.remove(), 600);
+  }
+  if (got) {
+    let best = -1; for (const k in got) if (best < 0 || ASTRALS[k].t > ASTRALS[best].t) best = +k;
+    const f = document.createElement('div'); f.className = 'float';
+    f.style.left = Math.max(0, x - 50) + 'px'; f.style.top = (y - 24) + 'px'; f.style.color = TIERS[ASTRALS[best].t].color;
+    f.innerHTML = `${crystal(best, 22)} +${got[best]} ${ASTRALS[best].n}`;
+    area.appendChild(f); setTimeout(() => f.remove(), 1000);
+  }
+});
+[[24,36,3],[124,54,10],[66,116,19],[146,124,26],[90,22,12]].forEach(([l, t, i]) => {
+  rock.insertAdjacentHTML('beforeend', `<div style="position:absolute;left:${l}px;top:${t}px;opacity:.85">${crystal(i, 26)}</div>`);
+});
+
+// ================= Отрисовка =================
+const $ = id => document.getElementById(id);
+function renderDrillAnim() {
+  let b = bestTier(); SECRET_DRILLS.forEach(i => { if (S.drills[i] >= 0) b = i; });
+  $('drillAnim').innerHTML = drillSvg(DRILLS[b].color, 64);
+  $('drillAnim').className = 'drill-anim' + (DRILLS[b].secret ? ' secret-drill' : '');
+  $('drillAnim').style.animationDuration = Math.max(0.15, 0.6 - b * 0.06) + 's';
+}
+let invDirty = true;
+function buildInv() {
+  $('invList').innerHTML = TIERS.map((tr, t) => {
+    const ids = BY_TIER[t], have = ids.filter(i => S.found[i]).length;
+    return `<div class="tier-title"><span style="color:${tr.color}">${tr.name}</span><span class="muted">${have}/${ids.length}</span></div>
+    <div class="grid">${ids.map(i => `<div class="cell" onclick="openItem(${i})" style="border-color:${S.found[i] ? tr.color + '55' : 'rgba(255,255,255,.08)'}">
+      <span class="cnt" id="cnt-${i}"></span>${crystal(i, 54, !S.found[i])}<div class="nm">${S.found[i] ? ASTRALS[i].n : '???'}</div></div>`).join('')}</div>`;
+  }).join('');
+  invDirty = false;
+}
+function build() {
+  $('drillList').innerHTML = REG_DRILLS.map(i => { const d = DRILLS[i]; return `
+    <div class="card" id="dc-${i}"><div class="ico">${drillSvg(d.color)}</div>
+      <div class="info"><b>${d.name}</b><small id="di-${i}"></small></div>
+      <button class="btn" id="db-${i}" onclick="drillAction(${i})"></button></div>`; }).join('')
+    + `<h2 style="margin-top:16px">Секретные буры</h2><p class="muted" style="margin-bottom:12px">Их нельзя купить. Они случайно находятся в шахте, пока работают буры.</p>`
+    + SECRET_DRILLS.map(i => { const d = DRILLS[i], own = S.drills[i] >= 0; return own ? `
+    <div class="card ${i === SECRET_DRILLS[SECRET_DRILLS.length - 1] ? 'pet-mega' : 'pet-legend'}" id="dc-${i}"><div class="ico secret-drill">${drillSvg(d.color)}</div>
+      <div class="info"><b>${d.name} <span class="${i === SECRET_DRILLS[SECRET_DRILLS.length - 1] ? 'tag-mega' : 'tag-legend'}">СЕКРЕТНЫЙ</span></b><small id="di-${i}"></small></div>
+      <button class="btn" id="db-${i}" onclick="drillAction(${i})"></button></div>` : `
+    <div class="card pet-secret" id="dc-${i}"><div class="ico" style="font-size:28px">❓</div>
+      <div class="info"><b>????? <span class="tag-mega">???</span></b><small id="di-${i}"></small></div>
+      <button class="btn" id="db-${i}" disabled>???</button></div>`; }).join('');
+  $('upgradeList').innerHTML = `
+    <div class="card"><div class="ico">🍀</div><div class="info"><b>Удача <span id="ulL"></span></b><small>+5% к шансу редких астралов</small></div>
+      <button class="btn" id="ubL" onclick="buyLuck()"></button></div>
+    <div class="card"><div class="ico">💪</div><div class="info"><b>Сила удара <span id="ulT"></span></b><small>Больше астралов за тап</small></div>
+      <button class="btn" id="ubT" onclick="buyTap()"></button></div>`;
+  $('petList').innerHTML = PET_ORDER.map(i => { const p = PETS[i];
+    const secret = p.hidden && !S.pets[i];
+    if (secret) return `<div class="card pet-secret" id="pc-${i}"><div class="ico pet-ico">❓<i id="pl-${i}"></i></div>
+      <div class="info"><b>????? <span class="tag-mega">???</span></b><small id="pi-${i}"></small></div>
+      <button class="btn" id="pb-${i}" disabled>???</button></div>`;
+    return `
+    <div class="card ${p.rare ? 'pet-' + p.rare : ''}" id="pc-${i}"><div class="ico pet-ico">${petIcon(i)}<i id="pl-${i}"></i></div>
+      <div class="info"><b>${p.name}${p.rare === 'mega' ? ' <span class="tag-mega">МЕГА-РЕДКИЙ</span>' : p.rare === 'legend' ? ' <span class="tag-legend">ЛЕГЕНДАРНЫЙ</span>' : p.rare === 'epic' ? ' <span class="tag-epic">ЭПИЧЕСКИЙ</span>' : p.rare === 'rare' ? ' <span class="tag-rare">РЕДКИЙ</span>' : ''}</b><small id="pi-${i}"></small></div>
+      <button class="btn" id="pb-${i}" onclick="buyPet(${i})"></button></div>`; }).join('');
+  $('vipBadge').innerHTML = crystal(33, 26) + '<span id="vipCount">0</span>';
+  renderDrillAnim();
+}
+
+let tab = 'mine';
+function update() {
+  $('coins').textContent = fmt(S.coins);
+  $('vipCount').textContent = fmt(S.items[32] + S.items[33]);
+  if (tab === 'mine') {
+    $('perSec').textContent = (totalPower() / STEP).toFixed(1);
+    $('tapStat').textContent = (tapPower() / STEP).toFixed(1);
+    $('collStat').textContent = S.found.reduce((a, b) => a + b, 0) + '/' + ASTRALS.length;
+    const p = tierProbs();
+    $('chances').innerHTML = TIERS.map((tr, t) => `<div class="chance-row"><span class="dot" style="background:${tr.color}"></span><span>${tr.name}</span><span>${p[t] > 0 ? pct(p[t]) : '🔒 нужен бур получше'}</span></div>`).join('');
+    const chips = [];
+    if (speedMul() > 1) chips.push(`⚡ скорость ×${speedMul().toFixed(2)}`);
+    if (moneyMul() > 1) chips.push(`💰 монеты ×${moneyMul().toFixed(2)}`);
+    if (luckMul() > 1) chips.push(`🍀 удача ×${luckMul().toFixed(2)}`);
+    if (tapMul() > 1) chips.push(`👊 тап ×${tapMul().toFixed(2)}`);
+    if (vipMul() > 1) chips.push(`💎 VIP/Ультра ×${vipMul().toFixed(2)}`);
+    $('boosts').innerHTML = chips.map(c => `<span class="boost-chip">${c}</span>`).join('');
+  }
+  if (tab === 'drills') {
+    const bt = bestTier();
+    DRILLS.forEach((d, i) => {
+      const lvl = S.drills[i], btn = $('db-' + i), locked = lvl < 0 && i > bt + 1;
+      if (d.secret) {
+        if (lvl < 0) { $('di-' + i).textContent = bt >= d.need ? 'Секретный бур. Может найтись в глубине шахты…' : `Секретный бур. Нужен ${DRILLS[d.need].name} или круче…`; return; }
+        const extra = [`+${Math.round(d.luck * 100)}% удача`, d.vip ? `+${Math.round(d.vip * 100)}% VIP/Ультра` : ''].filter(Boolean).join(', ');
+        $('di-' + i).textContent = `Ур. ${lvl + 1} · ${(drillPower(i) * speedMul() / STEP).toFixed(0)} астр./с · ${extra}`;
+        if (lvl >= MAX_LVL) { btn.textContent = 'МАКС'; btn.disabled = true; }
+        else { const c = upgradeCost(i); btn.textContent = `⬆ ${fmt(c)}`; btn.disabled = S.coins < c; }
+        return;
+      }
+      $('dc-' + i).classList.toggle('locked', locked);
+      if (lvl >= 0) {
+        $('di-' + i).textContent = `Ур. ${lvl + 1} · ${(drillPower(i) * speedMul() / STEP).toFixed(1)} астр./с`;
+        if (lvl >= MAX_LVL) { btn.textContent = 'МАКС'; btn.disabled = true; }
+        else { const c = upgradeCost(i); btn.textContent = `⬆ ${fmt(c)}`; btn.disabled = S.coins < c; }
+      } else {
+        $('di-' + i).textContent = locked ? 'Сначала купи предыдущий бур' : `+${(d.power / STEP).toFixed(1)} астр./с · выше шанс редких`;
+        btn.textContent = locked ? '🔒' : `Купить ${fmt(d.cost)}`;
+        btn.disabled = locked || S.coins < d.cost;
+      }
+    });
+    $('ulL').textContent = `· ур. ${S.luck}`; $('ubL').textContent = `🪙 ${fmt(luckCost())}`; $('ubL').disabled = S.coins < luckCost();
+    $('ulT').textContent = `· ур. ${S.tap}`;  $('ubT').textContent = `🪙 ${fmt(tapCost())}`;  $('ubT').disabled = S.coins < tapCost();
+  }
+  if (tab === 'pets') {
+    PETS.forEach((p, i) => {
+      const lvl = S.pets[i], btn = $('pb-' + i);
+      if (p.hidden && !lvl) {
+        $('pl-' + i).style.display = 'none';
+        $('pi-' + i).textContent = bestTier() >= 5 ? 'Скрытый питомец. Говорят, он прячется где-то в глубине шахты…' : 'Скрытый питомец. Чтобы его найти, нужен бур помощнее…';
+        return;
+      }
+      $('pc-' + i).classList.toggle('locked', lvl === 0 && S.coins < petCost(i));
+      $('pl-' + i).textContent = lvl ? lvl : '';
+      $('pl-' + i).style.display = lvl ? '' : 'none';
+      const bl = Object.entries(p.b).map(([k, v]) => `+${v * Math.max(1, lvl)}% ${BOOST_TXT[k]}`).join(', ');
+      $('pi-' + i).textContent = lvl ? bl : bl + ' за уровень';
+      if (lvl >= PET_MAX) { btn.textContent = 'МАКС'; btn.disabled = true; }
+      else { btn.textContent = (lvl ? '⬆ ' : 'Взять ') + fmt(petCost(i)); btn.disabled = S.coins < petCost(i); }
+    });
+  }
+  if (tab === 'inv') {
+    if (invDirty) buildInv();
+    let sum = 0;
+    ASTRALS.forEach((a, i) => {
+      if (a.t <= 2) sum += S.items[i] * sellPrice(i);
+      const c = $('cnt-' + i); if (c) c.textContent = S.items[i] ? fmt(S.items[i]) : '';
+    });
+    $('sellAll').textContent = `💰 Продать всё за 🪙 ${fmt(sum)}`;
+    $('sellAll').disabled = !sum;
+  }
+}
+
+document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => {
+  tab = b.dataset.tab;
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('active', x === b));
+  document.querySelectorAll('section').forEach(s => s.classList.toggle('active', s.id === 'tab-' + tab));
+  haptic('soft'); update();
+  if (tab === 'top') loadTop();
+}));
+
+// ================= Таблица лидеров =================
+const lbOn = () => SUPABASE_URL && SUPABASE_KEY;
+const lbHeaders = (extra = {}) => Object.assign({ apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+  SUPABASE_KEY.startsWith('sb_') ? {} : { Authorization: 'Bearer ' + SUPABASE_KEY }, extra);
+function playerInfo() {
+  const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+  if (u) return { id: u.id, name: (u.first_name + ' ' + (u.last_name || '')).trim() || u.username || 'Игрок' };
+  return null; // вне Telegram в топ не отправляем
+}
+async function submitScore() {
+  const p = playerInfo(); if (!lbOn() || !p) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/leaderboard`, {
+      method: 'POST', headers: lbHeaders({ Prefer: 'resolution=merge-duplicates' }),
+      body: JSON.stringify({ id: p.id, name: p.name.slice(0, 40), score: Math.floor(S.earned), vip: S.items[32] + S.items[33], updated_at: new Date().toISOString() })
+    });
+  } catch (e) {}
+}
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+async function loadTop() {
+  const me = playerInfo();
+  $('myRank').innerHTML = `<div class="ico">⛏️</div><div class="info"><b>Ты</b><small>Заработано: 🪙 ${fmt(S.earned)}</small></div><b id="myPlace" style="font-size:18px"></b>`;
+  if (!lbOn()) { $('topList').innerHTML = '<p class="muted">Таблица лидеров ещё не подключена. Впиши SUPABASE_URL и SUPABASE_KEY в начале кода игры.</p>'; return; }
+  await submitScore();
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/leaderboard?select=id,name,score,vip&order=score.desc&limit=50`, { headers: lbHeaders() });
+    const rows = await r.json();
+    const medal = k => ['🥇', '🥈', '🥉'][k] || (k + 1);
+    $('topList').innerHTML = rows.map((row, k) => `<div class="card" style="${me && row.id == me.id ? 'border-color:#ffd75e' : ''}">
+      <div class="ico" style="font-size:${k < 3 ? 28 : 16}px;font-weight:800">${medal(k)}</div>
+      <div class="info"><b>${esc(row.name)}</b><small>🪙 ${fmt(row.score)} · VIP/ультра: ${row.vip || 0}</small></div></div>`).join('') || '<p class="muted">Пока никого нет — будь первым!</p>';
+    if (me) {
+      const c = await fetch(`${SUPABASE_URL}/rest/v1/leaderboard?select=id&score=gt.${Math.floor(S.earned)}&limit=1`, { headers: lbHeaders({ Prefer: 'count=exact' }) });
+      const total = (c.headers.get('content-range') || '').split('/')[1];
+      if (total !== undefined && total !== '*') $('myPlace').textContent = '#' + (+total + 1);
+    } else $('myPlace').textContent = '';
+  } catch (e) { $('topList').innerHTML = '<p class="muted">Не удалось загрузить топ. Проверь интернет и настройки Supabase.</p>'; }
+}
+
+let toastTimer;
+function showToast(html) {
+  const t = $('toast'); t.innerHTML = html; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+function showModal(html, btnText = 'Забрать') {
+  $('modalBox').innerHTML = html + `<button class="btn wide" style="margin:12px 0 0" onclick="document.getElementById('modal').classList.remove('show')">${btnText}</button>`;
+  $('modal').classList.add('show');
+}
+
+// ================= Сохранение =================
+function save(cloud) {
+  S.t = Date.now();
+  const s = JSON.stringify(S);
+  try { localStorage.setItem(KEY, s); } catch (e) {}
+  if (cloud && hasCloud()) try { tg.CloudStorage.setItem(KEY, s, () => {}); } catch (e) {}
+}
+function merge(o) {
+  const d = defaults(); if (!o) return d;
+  const r = Object.assign(d, o);
+  ['items', 'found', 'drills', 'pets'].forEach(k => {
+    r[k] = defaults()[k].map((v, i) => (o[k] && o[k][i] !== undefined) ? o[k][i] : v);
+  });
+  return r;
+}
+function loadCloud() {
+  return new Promise(res => {
+    if (!hasCloud()) return res(null);
+    const to = setTimeout(() => res(null), 2000);
+    try {
+      tg.CloudStorage.getItem(KEY, (err, v) => { clearTimeout(to); try { res(v ? JSON.parse(v) : null); } catch (e) { res(null); } });
+    } catch (e) { clearTimeout(to); res(null); }
+  });
+}
+
+// ================= Запуск =================
+async function init() {
+  let local = null;
+  try { local = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  const cloud = await loadCloud();
+  const best = [local, cloud].filter(Boolean).sort((a, b) => b.t - a.t)[0];
+  S = merge(best);
+  const user = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+  if (user) $('hello').textContent = 'Шахтёр ' + user.first_name;
+  await new Promise(r => checkImages(r));
+  build();
+
+  // Добыча, пока игрок был оффлайн (50%, максимум 8 часов)
+  const dt = Math.min(8 * 3600, (Date.now() - S.t) / 1000);
+  if (best && dt > 60) {
+    const n = Math.floor(totalPower() * dt * 0.5 / STEP);
+    if (n > 0) {
+      const got = mine(n);
+      const rows = Object.keys(got).sort((a, b) => ASTRALS[b].t - ASTRALS[a].t)
+        .map(i => `<div class="chance-row">${crystal(+i, 26)}<span>${ASTRALS[i].n}</span><span>+${fmt(got[i])}</span></div>`).join('');
+      showModal(`<h3>⛏️ Пока тебя не было</h3><p class="muted">Буры работали ${Math.floor(dt / 60)} мин. и добыли:</p><div class="list">${rows}</div>`);
+    }
+    tryFinds(dt * 0.5); // если нашлось что-то секретное — его окно покажется поверх
+  }
+  update();
+  setInterval(() => addProgress(totalPower() * 0.1), 100);
+  setInterval(update, 250);
+  setInterval(() => save(false), 5000);
+  setInterval(() => save(true), 30000);
+  setInterval(submitScore, 60000); submitScore();
+  setInterval(() => tryFinds(1), 1000);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) save(true); });
+  window.addEventListener('pagehide', () => save(true));
+}
+init();
+</script>
+</body>
+</html>
