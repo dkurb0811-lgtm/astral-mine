@@ -81,6 +81,10 @@
   .pet-ico i { position: absolute; bottom: -6px; right: -4px; font-style: normal; font-size: 10px; font-weight: 800;
     background: linear-gradient(135deg,#ffe27a,#c98a10); color: #3a2400; border-radius: 10px; padding: 1px 5px; }
   .card .info { flex: 1; min-width: 0; }
+  .reb-head { border-color: rgba(255,79,163,.5); background: linear-gradient(135deg, rgba(255,79,163,.18), rgba(123,92,255,.12)); }
+  .req-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 6px; border-radius: 12px; background: rgba(255,255,255,.05); font-size: 14px; }
+  .req-row span:last-child { font-weight: 700; }
+  .req-ok { color: #2ee08a; } .req-no { color: #ff6b6b; }
   .pet-epic { border-color: rgba(180,107,255,.6); background: linear-gradient(135deg, rgba(180,107,255,.15), rgba(255,255,255,.04)); }
   .pet-legend { border: 1.5px solid #ffd75e; background: linear-gradient(135deg, rgba(255,215,94,.18), rgba(255,79,163,.12), rgba(58,176,232,.12));
     animation: legendpulse 1.6s infinite alternate; }
@@ -194,6 +198,17 @@
       <div id="topList"><p class="muted">Загрузка…</p></div>
     </section>
 
+    <section id="tab-reb">
+      <div class="card reb-head"><div class="ico" style="font-size:30px">🔄</div>
+        <div class="info"><b id="rbTitle"></b><small id="rbBonus"></small></div></div>
+      <h2>Условия перерождения</h2>
+      <div id="rbReq"></div>
+      <button class="btn wide pink" id="rbBtn" onclick="askRebirth()" style="margin-top:6px">🔄 Переродиться</button>
+      <p class="muted" style="font-size:12px;margin:-4px 0 14px;text-align:center">Сбросятся: монеты, обычные буры, сила удара, уровень астрала и астралы в инвентаре.<br>Останутся: коллекция, питомцы, секретные буры и буры перерождения.</p>
+      <h2>Буры перерождения</h2>
+      <div id="rbDrills"></div>
+    </section>
+
     <section id="tab-inv">
       <button class="btn wide" id="sellAll" onclick="sellAll()" style="margin-bottom:4px">Продать</button>
       <p class="muted" style="text-align:center;margin-bottom:12px;font-size:12px">Легендарные и VIP не продаются кнопкой, только вручную</p>
@@ -206,6 +221,7 @@
     <button data-tab="drills"><div>🔩</div>Буры</button>
     <button data-tab="pets"><div>🐾</div>Питомцы</button>
     <button data-tab="inv"><div>💎</div>Коллекция</button>
+    <button data-tab="reb"><div>🔄</div>Ребёрс</button>
     <button data-tab="top"><div>🏆</div>Топ</button>
   </nav>
 </div>
@@ -330,10 +346,30 @@ const DRILLS = [
   { name: 'Флоурит',    power: 10000, cost: 60000000,  color: '#3affd0', secret: true, speed: 0.4, money: 0,   need: 5,  rate: 1 / 30000,  text: 'Бур в честь Флоу. Сильно ускоряет добычу!' },
   { name: 'Кенриум',    power: 25000, cost: 400000000, color: '#ff3b3b', secret: true, speed: 1.5, money: 1.5, need: 10, rate: 1 / 200000, top: true, text: 'Самый редкий бур в игре, в честь Кенри. Скорость и монеты в разы больше!' },
   { name: 'Электронит', power: 13000, cost: 150000000, color: '#ffe14d', secret: true, speed: 0,   money: 0.4, need: 7,  rate: 1 / 60000,  text: 'Бур в честь Электрона. Приносит больше монет!' },
+  // Буры перерождения: открываются бесплатно за N-е перерождение и остаются навсегда (reborn = номер перерождения)
+  { name: 'Возрождённый бур', power: 300,    cost: 1e7,  color: '#9dffb0', reborn: 1 },
+  { name: 'Фениксовый бур',   power: 1500,   cost: 1e8,  color: '#ff8a3d', reborn: 2 },
+  { name: 'Звёздный бур',     power: 6000,   cost: 1e9,  color: '#7cc6ff', reborn: 3 },
+  { name: 'Небесный бур',     power: 25000,  cost: 1e10, color: '#e2c2ff', reborn: 4 },
+  { name: 'Бур Вечности',     power: 100000, cost: 1e11, color: '#ffd75e', reborn: 5 },
 ];
+const REBORN_DRILLS = DRILLS.map((d, i) => d.reborn ? i : -1).filter(i => i >= 0);
+// Условия перерождений: монеты + все обычные буры до upTo (номер бура) прокачаны до lvl
+function rebirthReq(n) {
+  const T = [
+    { coins: 1e8,  upTo: 7,  lvl: 5 },   // Золотой
+    { coins: 1e9,  upTo: 9,  lvl: 10 },  // Алмазный
+    { coins: 1e10, upTo: 11, lvl: 15 },  // Квантовый
+    { coins: 1e11, upTo: 12, lvl: 20 },  // Астральный
+    { coins: 1e12, upTo: 12, lvl: 30 },
+  ];
+  if (n < T.length) return T[n];
+  return { coins: 1e12 * Math.pow(10, n - T.length + 1), upTo: 12, lvl: Math.min(39, 30 + 3 * (n - T.length + 1)) };
+}
+const REB_SPEED = 0.25, REB_LUCK = 0.10; // бонус за каждое перерождение
 // Старые сохранения (8 обычных буров) → новые номера буров
 const OLD_DRILL_MAP = [0, 2, 4, 5, 7, 9, 10, 12, 13, 14];
-const REG_DRILLS = DRILLS.map((d, i) => d.secret ? -1 : i).filter(i => i >= 0);
+const REG_DRILLS = DRILLS.map((d, i) => (d.secret || d.reborn) ? -1 : i).filter(i => i >= 0);
 const SECRET_DRILLS = DRILLS.map((d, i) => d.secret ? i : -1).filter(i => i >= 0).sort((a, b) => DRILLS[a].need - DRILLS[b].need);
 const secretBonusAt = (i, l) => k => (DRILLS[i][k] || 0) * (1 + 0.05 * l);
 const secretBonus = k => SECRET_DRILLS.reduce((s, i) => s + (S.drills[i] >= 0 ? secretBonusAt(i, S.drills[i])(k) : 0), 0);
@@ -494,7 +530,7 @@ function defaults() {
   return {
     coins: 0, items: Array(ASTRALS.length).fill(0), found: Array(ASTRALS.length).fill(0),
     drills: DRILLS.map((_, i) => i === 0 ? 0 : -1), pets: PETS.map(() => 0),
-    dv: 2, luck: 0, tap: 0, astral: 0, progress: 0, total: 0, earned: 0, t: Date.now()
+    dv: 2, rebirths: 0, luck: 0, tap: 0, astral: 0, progress: 0, total: 0, earned: 0, t: Date.now()
   };
 }
 let S = defaults();
@@ -508,9 +544,9 @@ const fmt = n => {
 };
 const pct = v => v >= 0.1 ? (v * 100).toFixed(1) + '%' : v >= 0.001 ? (v * 100).toFixed(2) + '%' : (v * 100).toFixed(3) + '%';
 const petBoost = kind => 1 + PETS.reduce((s, p, i) => s + (p.removed ? 0 : S.pets[i] * (p.b[kind] || 0)), 0) / 100;
-const speedMul = () => petBoost('speed') + secretBonus('speed');
+const speedMul = () => petBoost('speed') + secretBonus('speed') + S.rebirths * REB_SPEED;
 const moneyMul = () => petBoost('money') + secretBonus('money');
-const luckMul  = () => petBoost('luck') + S.luck * 0.05 + S.astral * ASTRAL_LUCK;
+const luckMul  = () => petBoost('luck') + S.luck * 0.05 + S.astral * ASTRAL_LUCK + S.rebirths * REB_LUCK;
 const vipMul   = () => petBoost('vip');
 const tapMul   = () => petBoost('tap');
 
@@ -656,7 +692,7 @@ const drillSvg = (c, s = 40) => `<svg width="${s}" height="${s}" viewBox="0 0 40
 function drillAction(i) {
   const lvl = S.drills[i];
   if (lvl < 0) {
-    if (DRILLS[i].secret) return;
+    if (DRILLS[i].secret || DRILLS[i].reborn) return;
     if (i > bestTier() + 1 || S.coins < DRILLS[i].cost) return;
     S.coins -= DRILLS[i].cost; S.drills[i] = 0; haptic('medium');
     showToast(`🔩 ${DRILLS[i].name} куплен!`);
@@ -699,6 +735,46 @@ function openItem(i) {
     <button class="btn ${a.t >= 3 ? 'pink' : ''}" ${S.items[i] ? '' : 'disabled'} onclick="sell(${i}, true)">Продать все</button></div>`, 'Закрыть');
 }
 
+// ================= Перерождение =================
+function rebirthStatus() {
+  const r = rebirthReq(S.rebirths);
+  const rows = [{ ok: S.coins >= r.coins, text: `Монеты: ${fmt(Math.min(S.coins, r.coins))} / ${fmt(r.coins)}` }];
+  REG_DRILLS.filter(i => i <= r.upTo).forEach(i => {
+    const l = S.drills[i] < 0 ? 0 : S.drills[i] + 1;
+    rows.push({ ok: l >= r.lvl, text: `${DRILLS[i].name}: ур. ${Math.min(l, r.lvl)} / ${r.lvl}` });
+  });
+  return { r, rows, ok: rows.every(x => x.ok) };
+}
+function askRebirth() {
+  const st = rebirthStatus(); if (!st.ok) return;
+  const n = S.rebirths + 1, nd = REBORN_DRILLS.find(i => DRILLS[i].reborn === n);
+  showModal(`<div style="font-size:60px">🔄</div><h3>Перерождение ${n}</h3>
+    <p class="muted" style="margin:6px 0">Ты получишь навсегда: <b style="color:#2ee08a">+${Math.round(REB_SPEED * 100)}% скорость</b> и <b style="color:#2ee08a">+${Math.round(REB_LUCK * 100)}% удача</b>${nd !== undefined ? `<br>и новый бур: <b style="color:#ffd75e">${DRILLS[nd].name}</b>` : ''}.</p>
+    <p class="muted" style="font-size:12px">Монеты, обычные буры, сила удара, уровень астрала и астралы в инвентаре сбросятся.</p>
+    <button class="btn wide pink" onclick="doRebirth()">Переродиться!</button>`, 'Отмена');
+}
+function doRebirth() {
+  if (!rebirthStatus().ok) return;
+  S.rebirths++;
+  S.coins = 0; S.tap = 0; S.astral = 0; S.progress = 0;
+  S.items = S.items.map(() => 0);
+  REG_DRILLS.forEach(i => { S.drills[i] = i === 0 ? 0 : -1; });
+  REBORN_DRILLS.forEach(i => { if (DRILLS[i].reborn <= S.rebirths && S.drills[i] < 0) S.drills[i] = 0; });
+  invDirty = true; build(); renderDrillAnim(); renderAstral(true); save(true); update();
+  document.getElementById('modal').classList.remove('show');
+  hapticOk();
+  const nd = REBORN_DRILLS.find(i => DRILLS[i].reborn === S.rebirths);
+  showModal(`<div class="mega-reveal">${nd !== undefined ? drillSvg(DRILLS[nd].color, 110) : '<div style="font-size:80px">🔄</div>'}</div>
+    <h3 class="mega-text">ПЕРЕРОЖДЕНИЕ ${S.rebirths}!</h3>
+    <p class="muted">Скорость ×${speedMul().toFixed(2)}, удача ×${luckMul().toFixed(2)}${nd !== undefined ? `<br>Новый бур: <b style="color:#ffd75e">${DRILLS[nd].name}</b>` : ''}</p>`, 'Погнали!');
+}
+function rebDrillUp(i) {
+  if (S.drills[i] < 0) return;
+  const b = bulk(l => upgradeCostAt(i, l), S.drills[i], MAX_LVL);
+  if (!b.n || S.coins < b.cost) return;
+  S.coins -= b.cost; S.drills[i] = b.to; haptic(); save(); update();
+}
+
 // ================= Тап по камню =================
 const rock = document.getElementById('rock'), area = document.getElementById('mineArea');
 rock.addEventListener('pointerdown', e => {
@@ -739,7 +815,7 @@ function upAstral() {
 // ================= Отрисовка =================
 const $ = id => document.getElementById(id);
 function renderDrillAnim() {
-  let b = bestTier(); SECRET_DRILLS.forEach(i => { if (S.drills[i] >= 0) b = i; });
+  let b = bestTier(); [...SECRET_DRILLS, ...REBORN_DRILLS].forEach(i => { if (S.drills[i] >= 0 && DRILLS[i].power >= DRILLS[b].power) b = i; });
   $('drillAnim').innerHTML = drillSvg(DRILLS[b].color, 64);
   $('drillAnim').className = 'drill-anim' + (DRILLS[b].secret ? ' secret-drill' : '');
   $('drillAnim').style.animationDuration = Math.max(0.15, 0.6 - b * 0.06) + 's';
@@ -779,6 +855,10 @@ function build() {
     <div class="card ${PET_RARITY[p.rare] ? PET_RARITY[p.rare].card : ''}" id="pc-${i}"><div class="ico pet-ico">${petIcon(i)}<i id="pl-${i}"></i></div>
       <div class="info"><b>${p.name}${PET_RARITY[p.rare] ? ` <span class="${PET_RARITY[p.rare].tag}">${PET_RARITY[p.rare].name}</span>` : ''}</b><small id="pi-${i}"></small></div>
       <button class="btn" id="pb-${i}" onclick="buyPet(${i})"></button></div>`; }).join('');
+  $('rbDrills').innerHTML = REBORN_DRILLS.map(i => { const d = DRILLS[i]; return `
+    <div class="card" id="rc-${i}"><div class="ico">${drillSvg(d.color)}</div>
+      <div class="info"><b>${d.name} <span class="tag-epic">ЗА ${d.reborn} ПЕРЕРОЖД.</span></b><small id="ri-${i}"></small></div>
+      <button class="btn" id="rb-${i}" onclick="rebDrillUp(${i})"></button></div>`; }).join('');
   renderAstral();
   $('vipBadge').innerHTML = crystal(ULTRA_I, 26) + '<span id="vipCount">0</span>';
   renderDrillAnim();
@@ -823,6 +903,7 @@ function update() {
   if (tab === 'drills') {
     const bt = bestTier();
     DRILLS.forEach((d, i) => {
+      if (d.reborn) return;
       const lvl = S.drills[i], btn = $('db-' + i), locked = lvl < 0 && i > bt + 1;
       if (d.secret) {
         if (lvl < 0) { $('di-' + i).textContent = bt >= d.need ? 'Секретный бур. Может найтись в глубине шахты…' : `Секретный бур. Нужен ${DRILLS[d.need].name} или круче…`; return; }
@@ -871,6 +952,23 @@ function update() {
         $('pi-' + i).innerHTML = Object.entries(p.b).map(([k, v]) => lvl ? `+${v * lvl}% <span class="arrow">→ +${v * b.to}%</span> ${BOOST_TXT[k]}` : `<span class="arrow">+${v * b.to}%</span> ${BOOST_TXT[k]}`).join(', ');
         btn.textContent = btnText(b, lvl === 0); btn.disabled = S.coins < b.cost;
       }
+    });
+  }
+  if (tab === 'reb') {
+    const st = rebirthStatus();
+    $('rbTitle').textContent = `Перерождений: ${S.rebirths}`;
+    $('rbBonus').innerHTML = S.rebirths ? `Бонус: <span class="arrow">+${Math.round(S.rebirths * REB_SPEED * 100)}% скорость, +${Math.round(S.rebirths * REB_LUCK * 100)}% удача</span>` : `Каждое перерождение: +${Math.round(REB_SPEED * 100)}% скорость, +${Math.round(REB_LUCK * 100)}% удача навсегда`;
+    $('rbReq').innerHTML = st.rows.map(x => `<div class="req-row"><span>${x.ok ? '✅' : '❌'}</span><span>${x.text}</span></div>`).join('');
+    $('rbBtn').disabled = !st.ok;
+    $('rbBtn').textContent = st.ok ? `🔄 Переродиться (${S.rebirths + 1}-е)` : '🔒 Выполни все условия';
+    REBORN_DRILLS.forEach(i => {
+      const d = DRILLS[i], lvl = S.drills[i], btn = $('rb-' + i);
+      $('rc-' + i).classList.toggle('locked', lvl < 0);
+      if (lvl < 0) { $('ri-' + i).textContent = `Откроется на ${d.reborn}-м перерождении · ${fmtD(drillRateAt(i, 0))} астр./с`; btn.textContent = '🔒'; btn.disabled = true; return; }
+      if (lvl >= MAX_LVL) { $('ri-' + i).textContent = `Ур. ${lvl + 1} (макс) · ${fmtD(drillRateAt(i, lvl))} астр./с`; btn.textContent = 'МАКС'; btn.disabled = true; return; }
+      const b = bulk(l => upgradeCostAt(i, l), lvl, MAX_LVL);
+      $('ri-' + i).innerHTML = `Ур. ${lvl + 1} <span class="arrow">→ ${b.to + 1}</span> · ${fmtD(drillRateAt(i, lvl))} <span class="arrow">→ ${fmtD(drillRateAt(i, b.to))}</span> астр./с`;
+      btn.textContent = btnText(b); btn.disabled = S.coins < b.cost;
     });
   }
   if (tab === 'inv') {
