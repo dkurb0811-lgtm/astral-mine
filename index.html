@@ -259,7 +259,7 @@ const ASTRALS = [
 ];
 // Свои картинки: положи файлы в папку img рядом с index.html.
 // Астралы: img/a1.png ... img/a34.png (по порядку списка выше)
-// Питомцы: pet1 = Растовуха, pet2 = 42, pet3 = Дымка, pet4 = 42 Прайм, pet5 = WW, pet6 = Итумка, pet7 = Рутик, pet8 = Хоспик
+// Питомцы: pet1 = Растовуха, pet2 = 42, pet3 = Дымка, pet4 = 42 Прайм, pet5 = WW, pet6 = Лорсик, pet7 = Рутик, pet8 = Хоспик
 ASTRALS.forEach((a, i) => a.img = `img/a${i + 1}.png`);
 const BY_TIER = TIERS.map((_, t) => ASTRALS.map((a, i) => a.t === t ? i : -1).filter(i => i >= 0));
 
@@ -287,17 +287,17 @@ const PETS = [
   { name: 'Растовуха',  emoji: '🐹', cost: 400,     b: { luck: 10 },                         img: 'img/pet1.png', rare: 'rare' },
   { name: '42',         emoji: '🐩', cost: 1200,    b: { money: 15 },                        img: 'img/pet2.png', rare: 'rare' },
   { name: 'Дымка',      emoji: '🐈', cost: 5000,    b: { speed: 10 },                        img: 'img/pet3.png', rare: 'rare' },
-  { name: '42 Прайм',   emoji: '🧸', cost: 40000,   b: { tap: 30, luck: 5 },                 img: 'img/pet4.png', rare: 'epic' },
+  { name: '42 Прайм',   emoji: '🧸', cost: 40000,   b: { tap: 30, luck: 5 },                 img: 'img/pet4.png', rare: 'epic', removed: true },
   { name: 'WW',         emoji: '🐕', cost: 2500000, b: { vip: 35, speed: 15, money: 15, luck: 10 }, img: 'img/pet5.png', rare: 'legend' },
   // Скрытый МЕГА-редкий питомец: не продаётся, случайно находится в шахте (с Алмазного бура)
-  { name: 'Итумка',     emoji: '🐆', cost: 20000000, b: { speed: 40, money: 40, luck: 25, vip: 60, tap: 40 }, img: 'img/pet6.png', rare: 'mega', hidden: true },
+  { name: 'Лорсик',     emoji: '🐆', cost: 20000000, b: { speed: 40, money: 40, luck: 25, vip: 60, tap: 40 }, img: 'img/pet6.png', rare: 'mega', hidden: true },
   { name: 'Рутик',      emoji: '🐶', cost: 300000,  b: { money: 25, tap: 20 },                   img: 'img/pet7.png', rare: 'epic' },
   { name: 'Хоспик',     emoji: '🐈‍⬛', cost: 1200000, b: { luck: 20, speed: 15, vip: 20 },          img: 'img/pet8.png', rare: 'epic' },
 ];
-const ITUMKA = PETS.findIndex(p => p.name === 'Итумка');
+const ITUMKA = PETS.findIndex(p => p.name === 'Лорсик');
 // Порядок показа питомцев в списке (от простых к самым редким)
-const PET_ORDER = [0, 1, 2, 3, 6, 7, 4, 5];
-// Шанс найти Итумку за 1 секунду работы буров
+const PET_ORDER = [0, 1, 2, 6, 7, 4, 5]; // 42 Прайм (индекс 3) убран из игры
+// Шанс найти Лорсика за 1 секунду работы буров
 function itumkaChance() {
   const bt = bestTier(); if (bt < 5) return 0;
   return (1 / 25000) * (1 + 0.5 * (bt - 5)) * luckMul();
@@ -327,8 +327,8 @@ function tryItumka(seconds) {
   if (Math.random() < p) {
     S.pets[ITUMKA] = 1; save(true); build(); hapticOk();
     showModal(`<div class="mega-reveal">${petIconBig(ITUMKA)}</div><h3 class="mega-text">МЕГА-РЕДКИЙ ПИТОМЕЦ!</h3>
-      <p style="font-size:22px;font-weight:800;margin:6px 0">Итумка</p>
-      <p class="muted">Бенгальский кот из самой глубины шахты. Ускоряет всё сразу!</p>`, 'Забрать Итумку');
+      <p style="font-size:22px;font-weight:800;margin:6px 0">Лорсик</p>
+      <p class="muted">Бенгальский кот из самой глубины шахты. Ускоряет всё сразу!</p>`, 'Забрать Лорсика');
   }
 }
 const BOOST_TXT = { luck: 'удача', money: 'монеты', speed: 'скорость', tap: 'сила тапа', vip: 'шанс VIP/Ультра' };
@@ -358,7 +358,7 @@ const fmt = n => {
   return n.toFixed(n < 10 ? 2 : n < 100 ? 1 : 0) + u[i];
 };
 const pct = v => v >= 0.1 ? (v * 100).toFixed(1) + '%' : v >= 0.001 ? (v * 100).toFixed(2) + '%' : (v * 100).toFixed(3) + '%';
-const petBoost = kind => 1 + PETS.reduce((s, p, i) => s + S.pets[i] * (p.b[kind] || 0), 0) / 100;
+const petBoost = kind => 1 + PETS.reduce((s, p, i) => s + (p.removed ? 0 : S.pets[i] * (p.b[kind] || 0)), 0) / 100;
 const speedMul = () => petBoost('speed');
 const moneyMul = () => petBoost('money');
 const luckMul  = () => petBoost('luck') + S.luck * 0.05 + secretBonus('luck');
@@ -645,6 +645,7 @@ function update() {
   }
   if (tab === 'pets') {
     PETS.forEach((p, i) => {
+      if (p.removed) return;
       const lvl = S.pets[i], btn = $('pb-' + i);
       if (p.hidden && !lvl) {
         $('pl-' + i).style.display = 'none';
