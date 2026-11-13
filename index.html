@@ -158,6 +158,18 @@
   nav button { flex: 1; background: none; border: 0; color: #8d82ad; padding: 9px 0 11px; font-size: 9.5px; cursor: pointer; min-width: 0; overflow: hidden; }
   nav button div { font-size: 21px; margin-bottom: 2px; }
   nav button.active { color: #e2c2ff; }
+  nav button { font-size: 11px; }
+  .subnav { display: flex; gap: 6px; margin-bottom: 12px; }
+  .subnav:empty { display: none; }
+  .subnav button { flex: 1; padding: 9px 0; border-radius: 12px; border: 1px solid rgba(180,107,255,.25); background: rgba(255,255,255,.04); color: #b9aedb; font-weight: 700; font-size: 13px; cursor: pointer; }
+  .subnav button.on { background: linear-gradient(135deg, #b46bff, #7a4dff); color: #fff; border-color: transparent; }
+  .clan-row { display: flex; align-items: center; gap: 8px; padding: 7px 4px; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 13px; }
+  .clan-row:last-child { border-bottom: 0; }
+  .clan-row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .emo-pick { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 8px 0; }
+  .emo-pick button { font-size: 22px; width: 42px; height: 42px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); cursor: pointer; }
+  .emo-pick button.on { border-color: #ffd75e; background: rgba(255,215,94,.15); }
+  .inp { width: 100%; padding: 11px 12px; border-radius: 12px; border: 1px solid rgba(180,107,255,.35); background: rgba(0,0,0,.3); color: #fff; font-size: 15px; box-sizing: border-box; }
 
   #modal { position: fixed; inset: 0; background: rgba(0,0,0,.72); display: none; align-items: center; justify-content: center; z-index: 10; padding: 24px; }
   #modal.show { display: flex; }
@@ -181,6 +193,7 @@
   </header>
 
   <main>
+    <div class="subnav" id="subnav"></div>
     <section id="tab-mine" class="active">
       <div class="mine-area" id="mineArea">
         <div class="drill-anim" id="drillAnim"></div>
@@ -250,6 +263,14 @@
       <div id="rbDrills"></div>
     </section>
 
+    <section id="tab-clan">
+      <div id="clanMine"></div>
+      <h2 style="margin-top:6px">🏆 Топ кланов</h2>
+      <p class="muted" style="margin-bottom:10px">Очки клана — сумма монет, заработанных всеми участниками</p>
+      <input class="inp" id="clanSearch" placeholder="🔍 Поиск клана по названию" oninput="clanSearchSoon()" style="margin-bottom:10px">
+      <div id="clanTop"><p class="muted">Загрузка…</p></div>
+    </section>
+
     <section id="tab-inv">
       <button class="btn wide" id="sellAll" onclick="sellAll()" style="margin-bottom:4px">Продать</button>
       <p class="muted" style="text-align:center;margin-bottom:12px;font-size:12px">Легендарные и VIP не продаются кнопкой, только вручную</p>
@@ -258,13 +279,11 @@
   </main>
 
   <nav>
-    <button class="active" data-tab="mine"><div>⛏️</div>Шахта</button>
-    <button data-tab="drills"><div>🔩</div>Буры</button>
-    <button data-tab="pets"><div>🐾</div>Питомцы</button>
-    <button data-tab="inv"><div>💎</div>Коллекция</button>
-    <button data-tab="cases"><div>🎁</div>Кейсы</button>
-    <button data-tab="reb"><div>🔄</div>Ребёрс</button>
-    <button data-tab="top"><div>🏆</div>Топ</button>
+    <button class="active" data-group="mine"><div>⛏️</div>Шахта</button>
+    <button data-group="pets"><div>🐾</div>Питомцы</button>
+    <button data-group="inv"><div>💎</div>Коллекция</button>
+    <button data-group="clan"><div>🛡️</div>Кланы</button>
+    <button data-group="top"><div>🏆</div>Топ</button>
   </nav>
 </div>
 
@@ -449,6 +468,8 @@ const PETS = [
   { name: 'Бомбини Гуссини', emoji: '🪿', cost: 400,  b: { speed: 5 }, img: 'img/pet10.png', rare: 'rare' },
   { name: 'Триппи Троппа',   emoji: '🐟', cost: 900,  b: { money: 6 }, img: 'img/pet11.png', rare: 'rare' },
   { name: 'Трик Барабум',    emoji: '🌿', cost: 2000, b: { tap: 8 },   img: 'img/pet12.png', rare: 'rare' },
+  // Новый мифический — самый сильный среди мифических (два буста)
+  { name: 'Пчёлы', emoji: '🐝', cost: 800000, b: { speed: 15, money: 15 }, img: 'img/pet26.png', rare: 'myth' },
 ];
 const ITUMKA = PETS.findIndex(p => p.name === 'Лорсик');
 // Порядок показа питомцев в списке (от простых к самым редким)
@@ -576,7 +597,7 @@ function defaults() {
   return {
     coins: 0, items: Array(ASTRALS.length).fill(0), found: Array(ASTRALS.length).fill(0),
     drills: DRILLS.map((_, i) => i === 0 ? 0 : -1), pets: PETS.map(() => 0),
-    dv: 2, rebirths: 0, luck: 0, tap: 0, refs: 0, refBy: '', freeCases: [0, 0, 0], afkEff: 0, afkTime: 0, astral: 0, bg: 'space', bgs: ['space'], progress: 0, total: 0, earned: 0, t: Date.now()
+    dv: 2, rebirths: 0, luck: 0, tap: 0, refs: 0, refBy: '', clan: null, freeCases: [0, 0, 0], afkEff: 0, afkTime: 0, astral: 0, bg: 'space', bgs: ['space'], progress: 0, total: 0, earned: 0, t: Date.now()
   };
 }
 let S = defaults();
@@ -590,7 +611,7 @@ const fmt = n => {
 };
 const pct = v => v >= 0.1 ? (v * 100).toFixed(1) + '%' : v >= 0.001 ? (v * 100).toFixed(2) + '%' : (v * 100).toFixed(3) + '%';
 const petBoost = kind => 1 + PETS.reduce((s, p, i) => s + (p.removed ? 0 : S.pets[i] * (p.b[kind] || 0)), 0) / 100;
-const speedMul = () => petBoost('speed') + secretBonus('speed') + S.rebirths * REB_SPEED + refBoost();
+const speedMul = () => petBoost('speed') + secretBonus('speed') + S.rebirths * REB_SPEED + refBoost() + clanBoost();
 const moneyMul = () => petBoost('money') + secretBonus('money');
 const luckMul  = () => petBoost('luck') + S.luck * 0.05 + S.astral * ASTRAL_LUCK + S.rebirths * REB_LUCK + bgLuck();
 const vipMul   = () => petBoost('vip');
@@ -897,6 +918,143 @@ async function checkRefs() {
   } catch (e) {}
 }
 
+// ================= Кланы =================
+const CLAN_COST = 1e6;           // цена создания клана
+const CLAN_MAX = 30;             // максимум участников
+const CLAN_SPEED = 0.01, CLAN_BONUS_MAX = 0.30; // +1% скорость за каждого участника, максимум +30%
+const CLAN_EMOJI = ['🛡️','⚔️','🔥','💎','👑','🐉','🦊','🐺','🌙','⭐','⚡','🍀','💀','🚀','🌸','🐝'];
+const clanBoost = () => S.clan ? Math.min((S.clan.members || 1) * CLAN_SPEED, CLAN_BONUS_MAX) : 0;
+let clanMembers = [], clanLoading = false;
+const clanFetch = (path, opt = {}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, Object.assign({ headers: lbHeaders(opt.prefer ? { Prefer: opt.prefer } : {}) }, opt));
+// мой счёт в клане обновляется вместе с топом
+async function syncClanScore() {
+  const p = playerInfo(); if (!lbOn() || !p || !S.clan) return;
+  try {
+    const r = await clanFetch(`clan_members?user_id=eq.${p.id}&select=clan_id`);
+    const rows = await r.json();
+    if (!rows.length || rows[0].clan_id !== S.clan.id) { S.clan = null; save(true); update(); return; } // меня исключили или клан удалён
+    await clanFetch(`clan_members?user_id=eq.${p.id}`, { method: 'PATCH', body: JSON.stringify({ score: Math.floor(S.earned), name: p.name.slice(0, 40) }) });
+  } catch (e) {}
+}
+async function loadClan() {
+  if (!lbOn()) { $('clanMine').innerHTML = '<p class="muted">Кланы работают через Supabase — он не подключён.</p>'; return; }
+  const me = playerInfo();
+  if (!me) { $('clanMine').innerHTML = '<p class="muted">Кланы доступны только внутри Telegram.</p>'; }
+  if (clanLoading) return; clanLoading = true;
+  try {
+    if (me) {
+      const r = await clanFetch(`clan_members?user_id=eq.${me.id}&select=clan_id`);
+      const rows = r.ok ? await r.json() : [];
+      if (rows.length) {
+        const c = await (await clanFetch(`clan_top?id=eq.${rows[0].clan_id}`)).json();
+        if (c.length) S.clan = { id: c[0].id, name: c[0].name, emoji: c[0].emoji, owner: c[0].owner_id, members: c[0].members };
+        clanMembers = await (await clanFetch(`clan_members?clan_id=eq.${rows[0].clan_id}&select=user_id,name,score&order=score.desc`)).json();
+        S.clan && (S.clan.members = clanMembers.length);
+      } else { S.clan = null; clanMembers = []; }
+      save(true);
+    }
+    renderClanMine();
+    await loadClanTop();
+  } catch (e) { $('clanTop').innerHTML = '<p class="muted">Не удалось загрузить кланы. Проверь интернет.</p>'; }
+  clanLoading = false; update();
+}
+function renderClanMine() {
+  const me = myId(); if (!me) return;
+  if (!S.clan) {
+    $('clanMine').innerHTML = `<div class="case-card" style="--cc:#b46bff">
+      <div class="case-top"><div class="case-box">🛡️</div><div class="info"><b style="font-size:17px">Ты не в клане</b><small>Вступи в клан или создай свой</small></div></div>
+      <p class="muted" style="font-size:12px;margin:8px 0">Бонус клана: <b style="color:#2ee08a">+${Math.round(CLAN_SPEED * 100)}% скорость за каждого участника</b> (до +${Math.round(CLAN_BONUS_MAX * 100)}%). В клане до ${CLAN_MAX} человек.</p>
+      <div class="case-btns"><button class="btn" onclick="openCreateClan()" ${S.coins < CLAN_COST ? 'disabled' : ''}>➕ Создать · 🪙 ${fmt(CLAN_COST)}</button></div></div>`;
+    return;
+  }
+  const own = S.clan.owner == me;
+  $('clanMine').innerHTML = `<div class="case-card" style="--cc:#ffd75e">
+    <div class="case-top"><div class="case-box">${esc(S.clan.emoji || '🛡️')}</div><div class="info"><b style="font-size:17px">${esc(S.clan.name)}</b>
+      <small>👥 ${clanMembers.length}/${CLAN_MAX} · бонус <span class="arrow">+${Math.round(clanBoost() * 100)}% скорость</span></small></div></div>
+    <div style="margin:8px 0">${clanMembers.map((m, k) => `<div class="clan-row"><b style="width:22px">${['🥇','🥈','🥉'][k] || k + 1}</b>
+      <span class="nm">${m.user_id == S.clan.owner ? '👑 ' : ''}${esc(m.name || 'Игрок')}${m.user_id == me ? ' (ты)' : ''}</span>
+      <span class="muted">🪙 ${fmt(+m.score || 0)}</span>
+      ${own && m.user_id != me ? `<button class="btn ghost" style="min-width:0;padding:4px 8px;font-size:11px" onclick="kickMember(${m.user_id})">✖</button>` : ''}</div>`).join('')}</div>
+    <div class="case-btns"><button class="btn" onclick="inviteClan()">📨 Позвать в клан</button><button class="btn ghost" onclick="askLeaveClan()">🚪 Выйти</button></div></div>`;
+}
+let clanSearchT;
+function clanSearchSoon() { clearTimeout(clanSearchT); clanSearchT = setTimeout(loadClanTop, 400); }
+async function loadClanTop() {
+  const q = ($('clanSearch').value || '').trim().replace(/[%*,()]/g, '');
+  const r = await clanFetch(`clan_top?select=id,name,emoji,members,score&order=score.desc&limit=30${q ? `&name=ilike.*${encodeURIComponent(q)}*` : ''}`);
+  const rows = r.ok ? await r.json() : [];
+  const medal = k => ['🥇', '🥈', '🥉'][k] || (k + 1);
+  $('clanTop').innerHTML = rows.map((c, k) => `<div class="card" style="${S.clan && S.clan.id === c.id ? 'border-color:#ffd75e' : ''}">
+    <div class="ico" style="font-size:${q ? 26 : k < 3 ? 26 : 15}px;font-weight:800">${q ? esc(c.emoji || '🛡️') : medal(k)}</div>
+    <div class="info"><b>${q ? '' : esc(c.emoji || '🛡️') + ' '}${esc(c.name)}</b><small>🪙 ${fmt(+c.score || 0)} · 👥 ${c.members}/${CLAN_MAX}</small></div>
+    ${!S.clan && myId() ? `<button class="btn" onclick="joinClan(${c.id})" ${c.members >= CLAN_MAX ? 'disabled' : ''}>${c.members >= CLAN_MAX ? 'Полный' : 'Вступить'}</button>` : ''}</div>`).join('')
+    || `<p class="muted">${q ? 'Ничего не найдено' : 'Пока нет ни одного клана — создай первый!'}</p>`;
+}
+let newClanEmoji = CLAN_EMOJI[0];
+function openCreateClan() {
+  newClanEmoji = CLAN_EMOJI[0];
+  showModal(`<h3>➕ Новый клан</h3><p class="muted" style="margin:4px 0 10px">Цена: 🪙 ${fmt(CLAN_COST)}</p>
+    <input class="inp" id="clanName" maxlength="20" placeholder="Название (3–20 символов)">
+    <div class="emo-pick" id="emoPick">${CLAN_EMOJI.map((e, k) => `<button class="${k ? '' : 'on'}" onclick="pickClanEmoji(${k})">${e}</button>`).join('')}</div>
+    <button class="btn wide" onclick="createClan()">Создать</button>`, 'Отмена');
+}
+function pickClanEmoji(k) { newClanEmoji = CLAN_EMOJI[k]; document.querySelectorAll('#emoPick button').forEach((b, j) => b.classList.toggle('on', j === k)); }
+async function createClan() {
+  const me = playerInfo(); if (!me || S.clan) return;
+  const name = ($('clanName').value || '').trim().replace(/\s+/g, ' ');
+  if (name.length < 3) return showToast('Название — минимум 3 символа');
+  if (S.coins < CLAN_COST) return showToast('Не хватает монет');
+  try {
+    const r = await clanFetch('clans', { method: 'POST', prefer: 'return=representation', body: JSON.stringify({ name, emoji: newClanEmoji, owner_id: me.id }) });
+    if (!r.ok) { const t = await r.text(); return showToast(t.includes('duplicate') || t.includes('unique') ? '❌ Такое название уже занято' : '❌ Не получилось создать'); }
+    const c = (await r.json())[0];
+    const j = await clanFetch('clan_members', { method: 'POST', body: JSON.stringify({ user_id: me.id, clan_id: c.id, name: me.name.slice(0, 40), score: Math.floor(S.earned) }) });
+    if (!j.ok) return showToast('❌ Сначала выйди из старого клана');
+    S.coins -= CLAN_COST; S.clan = { id: c.id, name: c.name, emoji: c.emoji, owner: me.id, members: 1 }; save(true);
+    document.getElementById('modal').classList.remove('show'); hapticOk();
+    showToast(`${esc(c.emoji)} Клан «${esc(c.name)}» создан!`); loadClan();
+  } catch (e) { showToast('❌ Нет связи'); }
+}
+async function joinClan(id) {
+  const me = playerInfo(); if (!me || S.clan) return;
+  try {
+    const c = (await (await clanFetch(`clan_top?id=eq.${id}`)).json())[0];
+    if (!c) return showToast('Клан не найден');
+    if (c.members >= CLAN_MAX) return showToast('В клане нет мест');
+    const r = await clanFetch('clan_members', { method: 'POST', body: JSON.stringify({ user_id: me.id, clan_id: id, name: me.name.slice(0, 40), score: Math.floor(S.earned) }) });
+    if (!r.ok) return showToast('❌ Не получилось вступить');
+    S.clan = { id, name: c.name, emoji: c.emoji, owner: c.owner_id, members: c.members + 1 }; save(true); hapticOk();
+    showToast(`${esc(c.emoji || '🛡️')} Ты в клане «${esc(c.name)}»!`); loadClan();
+  } catch (e) { showToast('❌ Нет связи'); }
+}
+function askLeaveClan() {
+  const own = S.clan && S.clan.owner == myId();
+  showModal(`<h3>🚪 Выйти из клана?</h3><p class="muted">${own ? (clanMembers.length > 1 ? 'Ты глава. Главой станет участник с самым большим счётом.' : 'Ты последний участник — клан будет удалён.') : 'Бонус клана пропадёт.'}</p>
+    <button class="btn wide pink" onclick="leaveClan()">Да, выйти</button>`, 'Отмена');
+}
+async function leaveClan() {
+  const me = myId(); if (!me || !S.clan) return;
+  const c = S.clan, rest = clanMembers.filter(m => m.user_id != me);
+  try {
+    await clanFetch(`clan_members?user_id=eq.${me}`, { method: 'DELETE' });
+    if (!rest.length) await clanFetch(`clans?id=eq.${c.id}`, { method: 'DELETE' });
+    else if (c.owner == me) await clanFetch(`clans?id=eq.${c.id}`, { method: 'PATCH', body: JSON.stringify({ owner_id: rest[0].user_id }) });
+  } catch (e) {}
+  S.clan = null; clanMembers = []; save(true);
+  document.getElementById('modal').classList.remove('show'); showToast('Ты вышел из клана'); loadClan();
+}
+async function kickMember(uid) {
+  if (!S.clan || S.clan.owner != myId()) return;
+  try { await clanFetch(`clan_members?user_id=eq.${uid}&clan_id=eq.${S.clan.id}`, { method: 'DELETE' }); } catch (e) {}
+  showToast('Участник исключён'); loadClan();
+}
+function inviteClan() {
+  if (!S.clan) return;
+  const text = `${S.clan.emoji} Вступай в мой клан «${S.clan.name}» в Астральной шахте! Открой вкладку 🛡️ Кланы и найди его в поиске.`;
+  const url = `https://t.me/share/url?url=${encodeURIComponent(refLink())}&text=${encodeURIComponent(text)}`;
+  try { tg.openTelegramLink(url); } catch (e) { window.open(url, '_blank'); }
+}
+
 // ================= Кейсы =================
 const RAR_COLOR = { rare: '#4da3ff', epic: '#b46bff', myth: '#ff5a5a', legend: '#ffd75e', march: '#ff4fa3', secret: '#3affd0' };
 const RAR_NAME = { rare: 'Редкий', epic: 'Эпический', myth: 'Мифический', legend: 'Легендарный', march: 'Мартовский', secret: 'Секретный бур' };
@@ -1139,6 +1297,7 @@ function update() {
     if (luckMul() > 1) chips.push(`🍀 удача ×${luckMul().toFixed(2)}`);
     if (tapMul() > 1) chips.push(`👊 тап ×${tapMul().toFixed(2)}`);
     if (refBoost() > 0) chips.push(`👥 друзья +${Math.round(refBoost() * 100)}% скорость`);
+    if (clanBoost() > 0) chips.push(`🛡️ клан +${Math.round(clanBoost() * 100)}% скорость`);
     if (bgLuck() > 0) chips.push(`${curBg().icon} фон +${Math.round(bgLuck() * 100)}% удача`);
     if (vipMul() > 1) chips.push(`💎 VIP/Ультра ×${vipMul().toFixed(2)}`);
     $('boosts').innerHTML = chips.map(c => `<span class="boost-chip">${c}</span>`).join('');
@@ -1248,12 +1407,35 @@ function update() {
   }
 }
 
-document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => {
-  tab = b.dataset.tab;
-  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('active', x === b));
+// Нижняя панель: 5 кнопок, внутри некоторых — вкладки сверху
+const GROUPS = {
+  mine: [['mine', '⛏️ Шахта'], ['drills', '🔩 Буры'], ['reb', '🔄 Ребёрс']],
+  pets: [['pets', '🐾 Питомцы'], ['cases', '🎁 Кейсы']],
+  inv:  [['inv', '💎 Коллекция']],
+  clan: [['clan', '🛡️ Кланы']],
+  top:  [['top', '🏆 Топ']],
+};
+const lastSub = { mine: 'mine', pets: 'pets', inv: 'inv', clan: 'clan', top: 'top' };
+let group = 'mine';
+function openTab(t) {
+  tab = t; lastSub[group] = t;
+  const subs = GROUPS[group];
+  $('subnav').innerHTML = subs.length > 1 ? subs.map(([id, txt]) => `<button class="${id === t ? 'on' : ''}" onclick="openTab('${id}')">${txt}</button>`).join('') : '';
   document.querySelectorAll('section').forEach(s => s.classList.toggle('active', s.id === 'tab-' + tab));
+  document.querySelector('main').scrollTop = 0;
   haptic('soft'); update();
   if (tab === 'top') { loadTop(); checkRefs(); }
+  if (tab === 'clan') loadClan();
+}
+function goTab(t) { // открыть вкладку из любого места (например, из подсказки)
+  const g = Object.keys(GROUPS).find(k => GROUPS[k].some(x => x[0] === t)) || 'mine';
+  group = g; document.querySelectorAll('nav button').forEach(x => x.classList.toggle('active', x.dataset.group === g));
+  openTab(t);
+}
+document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => {
+  group = b.dataset.group;
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('active', x === b));
+  openTab(lastSub[group]);
 }));
 
 // ================= Таблица лидеров =================
@@ -1387,7 +1569,7 @@ async function init() {
   setInterval(update, 250);
   setInterval(() => save(false), 5000);
   setInterval(() => save(true), 30000);
-  setInterval(submitScore, 60000); submitScore();
+  setInterval(() => { submitScore(); syncClanScore(); }, 60000); submitScore(); syncClanScore();
   handleStartParam(!best).then(checkRefs);
   setInterval(checkRefs, 120000);
   setInterval(() => tryFinds(1), 1000);
